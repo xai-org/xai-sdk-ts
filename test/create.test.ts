@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { xAI, models, SDK_USER_AGENT, SDK_VERSION } from "../src/index.js";
+import { xAI, SDK_USER_AGENT, SDK_VERSION } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch, usageFixture } from "./helpers.js";
 
 function client(fetch: typeof globalThis.fetch): xAI {
@@ -128,7 +128,7 @@ describe("responses.create", () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
     const blob = new Blob(["png-bytes"], { type: "image/png" });
     await client(fetch).responses.create({
-      model: models.Grok46,
+      model: "grok-4.6",
       input: [
         {
           role: "user",

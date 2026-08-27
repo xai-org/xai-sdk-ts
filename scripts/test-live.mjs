@@ -12,8 +12,8 @@ if (!Number.isFinite(maxCostUsd) || maxCostUsd <= 0) {
   throw new Error("XAI_TEST_MAX_COST_USD must be a positive number");
 }
 
-const { models, xAI } = await import("../dist/index.js");
-const model = process.env.XAI_TEST_MODEL ?? models.Grok46;
+const { xAI } = await import("../dist/index.js");
+const model = process.env.XAI_TEST_MODEL ?? "grok-4.6";
 
 const client = new xAI({
   apiKey,

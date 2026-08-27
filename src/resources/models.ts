@@ -12,7 +12,7 @@ function requireRecord(
     return payload as Record<string, unknown>;
   }
   throw new APIProtocolError(`${label} must be a JSON object`, {
-    request_id: requestId,
+    requestId,
     body: payload,
   });
 }
@@ -38,7 +38,7 @@ export class ModelsResource {
       )
     ) {
       throw new APIProtocolError("Model list is missing object=list or data", {
-        request_id: result.http.requestId,
+        requestId: result.http.requestId,
         body,
       });
     }
@@ -54,7 +54,7 @@ export class ModelsResource {
     const body = requireRecord(result.payload, result.http.requestId, "Model");
     if (typeof body.id !== "string" || body.id.length === 0) {
       throw new APIProtocolError("Model response is missing id", {
-        request_id: result.http.requestId,
+        requestId: result.http.requestId,
         body,
       });
     }

@@ -150,7 +150,7 @@ describe("responses.create stream", () => {
       caught = error;
     }
     expect(caught).toBeInstanceOf(TimeoutError);
-    expect((caught as TimeoutError).request_id).toBe("req_test");
+    expect((caught as TimeoutError).requestId).toBe("req_test");
     expect(types).toContain("ping");
     expect(cancelled).toBe(true);
   });

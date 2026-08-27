@@ -38,7 +38,7 @@ export class xAIResponse {
   constructor(payload: unknown, http: HttpMeta) {
     if (!isRecord(payload)) {
       throw new APIProtocolError("Response body must be a JSON object", {
-        request_id: http.requestId,
+        requestId: http.requestId,
         body: payload,
       });
     }
@@ -50,7 +50,7 @@ export class xAIResponse {
       !Array.isArray(wire.output)
     ) {
       throw new APIProtocolError("Response body is missing id, status, or output", {
-        request_id: http.requestId,
+        requestId: http.requestId,
         body: wire,
       });
     }

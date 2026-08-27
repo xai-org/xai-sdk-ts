@@ -33,7 +33,7 @@ describe("typed errors", () => {
       } catch (err) {
         expect(APIError.is(err)).toBe(true);
         expect(err).toBeInstanceOf(Ctor);
-        expect((err as APIError).request_id).toBe("req_test");
+        expect((err as APIError).requestId).toBe("req_test");
       }
     }
   });

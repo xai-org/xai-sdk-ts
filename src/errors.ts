@@ -1,7 +1,7 @@
 const BRAND = Symbol.for("@xai-official/sdk:APIError");
 
 type ErrorInit = {
-  request_id?: string | null;
+  requestId?: string | null;
   status?: number;
   code?: string | null;
   body?: unknown;
@@ -9,7 +9,7 @@ type ErrorInit = {
 };
 
 export class APIError extends Error {
-  readonly request_id: string | null;
+  readonly requestId: string | null;
   readonly status: number | undefined;
   readonly code: string | null;
   readonly body: unknown;
@@ -18,7 +18,7 @@ export class APIError extends Error {
   constructor(message: string, init: ErrorInit = {}) {
     super(message, init.cause !== undefined ? { cause: init.cause } : undefined);
     this.name = new.target.name;
-    this.request_id = init.request_id ?? null;
+    this.requestId = init.requestId ?? null;
     this.status = init.status;
     this.code = init.code ?? null;
     this.body = init.body;
@@ -146,7 +146,7 @@ export function errorFromStatus(
 }
 
 export async function errorFromResponse(res: Response, body?: unknown): Promise<APIStatusError> {
-  const request_id = requestIdFromHeaders(res.headers);
+  const requestId = requestIdFromHeaders(res.headers);
   let parsed = body;
   if (parsed === undefined) {
     const text = await res.text().catch(() => "");
@@ -172,23 +172,23 @@ export async function errorFromResponse(res: Response, body?: unknown): Promise<
   } else if (typeof parsed === "string" && parsed.length > 0) {
     message = parsed;
   }
-  return errorFromStatus(statusOf(res), message, { request_id, code, body: parsed });
+  return errorFromStatus(statusOf(res), message, { requestId, code, body: parsed });
 }
 
 function statusOf(res: Response): number {
   return res.status;
 }
 
-export function errorFromAbort(signal: AbortSignal, request_id: string | null): APIError {
+export function errorFromAbort(signal: AbortSignal, requestId: string | null): APIError {
   const reason = signal.reason;
   if (APIError.is(reason)) {
-    if (reason.name === "TimeoutError" && reason.request_id === null && request_id !== null) {
-      return new TimeoutError(reason.message, { request_id, cause: reason });
+    if (reason.name === "TimeoutError" && reason.requestId === null && requestId !== null) {
+      return new TimeoutError(reason.message, { requestId, cause: reason });
     }
     return reason;
   }
   if (isTimeoutLike(reason)) {
-    return new TimeoutError("Request timed out", { request_id, cause: reason });
+    return new TimeoutError("Request timed out", { requestId, cause: reason });
   }
   const message =
     typeof reason === "string" && reason.length > 0
@@ -196,25 +196,25 @@ export function errorFromAbort(signal: AbortSignal, request_id: string | null): 
       : reason instanceof Error
         ? reason.message
         : "Request aborted";
-  return new AbortError(message, { request_id, cause: reason });
+  return new AbortError(message, { requestId, cause: reason });
 }
 
-export function errorFromUnknown(err: unknown, request_id: string | null): APIError {
+export function errorFromUnknown(err: unknown, requestId: string | null): APIError {
   if (APIError.is(err)) return err;
   if (isTimeoutLike(err)) {
     return new TimeoutError(err instanceof Error ? err.message : "Request timed out", {
-      request_id,
+      requestId,
       cause: err,
     });
   }
   if (isAbortLike(err)) {
     return new AbortError(err instanceof Error ? err.message : "Request aborted", {
-      request_id,
+      requestId,
       cause: err,
     });
   }
   const message = err instanceof Error ? err.message : "Connection error";
-  return new APIConnectionError(message, { request_id, cause: err });
+  return new APIConnectionError(message, { requestId, cause: err });
 }
 
 export function isTimeoutLike(err: unknown): boolean {
@@ -231,23 +231,23 @@ export function isAbortLike(err: unknown): boolean {
 
 export function streamErrorEvent(
   raw: Record<string, unknown>,
-  request_id: string | null,
+  requestId: string | null,
 ): { event: Record<string, unknown>; error: APIError } {
   const codeRaw = raw.code;
   const codeNum = typeof codeRaw === "number" ? codeRaw : Number.parseInt(String(codeRaw ?? ""), 10);
   const message = typeof raw.message === "string" ? raw.message : "Stream error";
   let error: APIError;
   if (codeNum === 529 || /overloaded/i.test(message)) {
-    error = new OverloadedError(message, { request_id, code: codeRaw != null ? String(codeRaw) : "529" });
+    error = new OverloadedError(message, { requestId, code: codeRaw != null ? String(codeRaw) : "529" });
   } else if (codeNum >= 400 && codeNum < 600) {
     error = errorFromStatus(codeNum, message, {
-      request_id,
+      requestId,
       code: codeRaw != null ? String(codeRaw) : null,
       body: raw,
     });
   } else {
     error = new APIError(message, {
-      request_id,
+      requestId,
       code: codeRaw != null ? String(codeRaw) : null,
       body: raw,
     });

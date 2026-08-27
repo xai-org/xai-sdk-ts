@@ -16,7 +16,7 @@ function requireRecord(
     return payload as Record<string, unknown>;
   }
   throw new APIProtocolError(`${label} must be a JSON object`, {
-    request_id: requestId,
+    requestId,
     body: payload,
   });
 }
@@ -78,7 +78,7 @@ export class Responses {
       : requireRecord(result.payload, result.http.requestId, "Delete response");
     if (typeof body.id !== "string" || body.deleted !== true) {
       throw new APIProtocolError("Delete response is missing id or deleted=true", {
-        request_id: result.http.requestId,
+        requestId: result.http.requestId,
         body,
       });
     }
@@ -103,7 +103,7 @@ export class InputItems {
     const body = requireRecord(result.payload, result.http.requestId, "Input item list");
     if (body.object !== "list" || !Array.isArray(body.data)) {
       throw new APIProtocolError("Input item list is missing object=list or data", {
-        request_id: result.http.requestId,
+        requestId: result.http.requestId,
         body,
       });
     }

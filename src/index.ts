@@ -1,5 +1,4 @@
 export { xAI } from "./client.js";
-export { models } from "./models.js";
 export { SDK_VERSION } from "./version.js";
 export { SDK_USER_AGENT } from "./constants.js";
 export { xAIResponse } from "./response.js";
@@ -19,7 +18,7 @@ export {
 } from "./errors.js";
 export { isFunctionCall, isMessage, isReasoning, toInput, toText } from "./porcelain.js";
 export type { Usage } from "./usage.js";
-export type { NamedModel } from "./models.js";
+export type { KnownModelId, ModelId } from "./models.js";
 export type {
   ClientOptions,
   CreateParams,
@@ -35,5 +34,6 @@ export type {
   RequestHook,
   RequestOpts,
   ResponseHook,
+  Tool,
   xAIStreamEvent,
 } from "./types.js";

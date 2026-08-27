@@ -15,7 +15,7 @@ describe("API protocol validation", () => {
       new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody),
     ).rejects.toMatchObject({
       name: "APIProtocolError",
-      request_id: "req_html",
+      requestId: "req_html",
     });
   });
 

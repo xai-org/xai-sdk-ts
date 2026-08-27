@@ -353,12 +353,12 @@ export async function send(client: xAI, req: InternalRequest): Promise<SendResul
           await response.body?.cancel().catch(() => {});
           cleanupAttempt();
           throw new APIProtocolError("Streaming response must use text/event-stream", {
-            request_id: lastRequestId,
+            requestId: lastRequestId,
           });
         }
         if (!response.body) {
           cleanupAttempt();
-          throw new APIConnectionError("SSE response had no body", { request_id: lastRequestId });
+          throw new APIConnectionError("SSE response had no body", { requestId: lastRequestId });
         }
         const peeked = await peekFirstChunk(
           response,
@@ -417,7 +417,7 @@ async function peekFirstChunk(
   onFinalize: () => void,
 ): Promise<PeekResult> {
   const body = response.body;
-  if (!body) return { sawByte: false, stream: null, error: new APIConnectionError("SSE response had no body", { request_id: requestId }) };
+  if (!body) return { sawByte: false, stream: null, error: new APIConnectionError("SSE response had no body", { requestId }) };
 
   const reader = body.getReader();
   try {
@@ -532,7 +532,7 @@ async function readOnce(
     if (idleTimeout > 0) {
       idle = setTimeout(() => {
         void reader.cancel().catch(() => {});
-        finish(() => reject(new TimeoutError("Idle timeout", { request_id: requestId })));
+        finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
       }, idleTimeout);
     }
     reader.read().then(
@@ -561,7 +561,7 @@ async function readBodyWithIdle(
       bytesRead += result.value.byteLength;
       if (maxBytes > 0 && bytesRead > maxBytes) {
         throw new APIProtocolError(`Response body exceeds ${maxBytes} bytes`, {
-          request_id: requestId,
+          requestId,
         });
       }
       out += decoder.decode(result.value, { stream: true });

@@ -1,6 +1,9 @@
 import type { components } from "./generated/types.js";
+import type { ModelId } from "./models.js";
 
 type Schema = components["schemas"];
+type GeneratedTool = Schema["ModelTool"];
+type GeneratedWebSearchTool = Extract<GeneratedTool, { type: "web_search" }>;
 
 export type OutputItem = Schema["ModelOutput"];
 export type IncompleteDetails = Schema["IncompleteDetails"];
@@ -8,6 +11,11 @@ export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
 export type InputItemList = Schema["ListInputItemsResponse"];
 export type Model = Schema["Model"];
 export type ModelList = Schema["ListModelsResponse"];
+export type Tool =
+  | Exclude<GeneratedTool, GeneratedWebSearchTool>
+  | (Omit<GeneratedWebSearchTool, "search_context_size"> & {
+      search_context_size?: GeneratedWebSearchTool["search_context_size"];
+    });
 
 /** Client-only: inlined to `image_url` before send. */
 type ImageBlobPart = {
@@ -23,10 +31,13 @@ export type InputItem =
       content: string | Array<Schema["ModelInputContentItem"] | ImageBlobPart>;
     };
 
-export type CreateParams = Partial<Omit<Schema["ModelRequest"], "input" | "model" | "stream" | "store">> & {
-  model: string;
+export type CreateParams = Partial<
+  Omit<Schema["ModelRequest"], "input" | "model" | "store" | "stream" | "tools">
+> & {
+  model: ModelId;
   input: string | InputItem[];
   stream?: boolean;
+  tools?: Tool[] | null;
   /**
    * Persist the response for later `get` / `previous_response_id`.
    * SDK default is **false**. The API wire default is true (stored for 30 days).

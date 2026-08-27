@@ -63,25 +63,35 @@ try {
     JSON.stringify({ private: true, type: "module" }),
   );
   await writeFile(path.join(TEMP, "esm.mjs"), `
-    import { SDK_USER_AGENT, SDK_VERSION, models, xAI } from "@xai-official/sdk";
+    import { SDK_USER_AGENT, SDK_VERSION, xAI } from "@xai-official/sdk";
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad ESM version");
     if (SDK_USER_AGENT !== \`XaiSdk/\${SDK_VERSION}\`) throw new Error("bad ESM user agent");
-    if (models.Grok46 !== "grok-4.6") throw new Error("bad ESM model");
     if (typeof xAI !== "function") throw new Error("missing ESM client");
   `);
   await writeFile(path.join(TEMP, "cjs.cjs"), `
-    const { SDK_USER_AGENT, SDK_VERSION, models, xAI } = require("@xai-official/sdk");
+    const { SDK_USER_AGENT, SDK_VERSION, xAI } = require("@xai-official/sdk");
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad CJS version");
     if (SDK_USER_AGENT !== \`XaiSdk/\${SDK_VERSION}\`) throw new Error("bad CJS user agent");
-    if (models.Grok46 !== "grok-4.6") throw new Error("bad CJS model");
     if (typeof xAI !== "function") throw new Error("missing CJS client");
   `);
   await writeFile(path.join(TEMP, "consumer.ts"), `
-    import { models, xAI, type DeletedResponse, type NamedModel } from "@xai-official/sdk";
-    const model: NamedModel = models.Grok46;
+    import { xAI, type CreateParams, type DeletedResponse, type KnownModelId, type ModelId, type Tool } from "@xai-official/sdk";
+    const model = "grok-4.6" satisfies KnownModelId;
+    const futureModel = "grok-released-after-this-sdk" satisfies ModelId;
     const deleted = null as DeletedResponse | null;
+    const functionTool = {
+      type: "function",
+      name: "example",
+      parameters: { type: "object" },
+    } satisfies Tool;
+    const webSearchTool = { type: "web_search" } satisfies Tool;
+    const params = {
+      model,
+      input: "test",
+      tools: [{ type: "web_search" }],
+    } satisfies CreateParams;
     const client: xAI = new xAI({ apiKey: "test", fetch: globalThis.fetch });
-    void [model, deleted, client];
+    void [model, futureModel, deleted, functionTool, webSearchTool, params, client];
   `);
   await writeFile(
     path.join(TEMP, "tsconfig.json"),

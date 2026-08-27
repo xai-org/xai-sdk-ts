@@ -93,7 +93,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
         this.status !== "incomplete"
       ) {
         throw new APIProtocolError("Stream ended without a terminal response event", {
-          request_id: this.#requestId,
+          requestId: this.#requestId,
         });
       }
       if (this.status === "completed") this.usage = mapUsage(this.usage);
@@ -189,7 +189,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     if (!isRecord(response)) {
       if (terminal) {
         throw new APIProtocolError("Terminal stream event is missing a response object", {
-          request_id: this.#requestId,
+          requestId: this.#requestId,
           body: response,
         });
       }
@@ -203,7 +203,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
         !Array.isArray(response.output))
     ) {
       throw new APIProtocolError("Terminal stream response is missing id, status, or output", {
-        request_id: this.#requestId,
+        requestId: this.#requestId,
         body: response,
       });
     }
