@@ -1,0 +1,12 @@
+node_modules
+.pnpm-store
+dist
+artifacts
+coverage
+*.tsbuildinfo
+.DS_Store
+*.log
+.vscode
+.idea
+.env
+.investigation
