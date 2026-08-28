@@ -1,21 +1,27 @@
 import { ENCRYPTED_REASONING, SDK_STORE_DEFAULT } from "./constants.js";
 import { errorFromAbort } from "./errors.js";
-import type { components } from "./generated/types.js";
-import type { CreateParams, InputItem, OutputItem } from "./types.js";
+import type {
+  CreateParams,
+  FunctionToolCall,
+  InputItem,
+  OutputItem,
+  OutputMessage,
+  ReasoningItem,
+} from "./types.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function isMessage(item: unknown): item is components["schemas"]["OutputMessage"] {
+export function isMessage(item: unknown): item is OutputMessage {
   return isRecord(item) && item.type === "message";
 }
 
-export function isReasoning(item: unknown): item is components["schemas"]["Reasoning"] {
+export function isReasoning(item: unknown): item is ReasoningItem {
   return isRecord(item) && item.type === "reasoning";
 }
 
-export function isFunctionCall(item: unknown): item is components["schemas"]["FunctionToolCall"] {
+export function isFunctionCall(item: unknown): item is FunctionToolCall {
   return isRecord(item) && item.type === "function_call";
 }
 

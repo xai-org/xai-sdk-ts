@@ -168,6 +168,7 @@ const response = await client.responses.create({
         {
           type: "input_image",
           image_url: "https://example.com/image.jpg",
+          detail: "high",
         },
       ],
     },
@@ -447,7 +448,7 @@ try {
   } else if (error instanceof RateLimitError) {
     console.error("Rate limited. Retry later.");
   } else if (APIError.is(error)) {
-    console.error(error.status, error.requestId, error.message);
+    console.error(error.status, error.code, error.param, error.requestId, error.message);
   } else {
     throw error;
   }
@@ -466,7 +467,7 @@ XAI_DEBUG=1 node app.js
 
 Authentication headers and common credential fields are redacted. Request bodies are not, so avoid debug logging where prompts or tool outputs may contain sensitive data.
 
-The xAI request ID is also available at `response.http.requestId` and `error.requestId`. Include it when reporting an API problem.
+Structured API failures expose `error.type`, `error.code`, and `error.param` when the server returns them. The xAI request ID is also available at `response.http.requestId` and `error.requestId`. Include it when reporting an API problem.
 
 ## Development
 
@@ -494,8 +495,6 @@ pnpm pack:artifact
 ```
 
 Generated API types live in `src/generated/types.ts`, and the model ID union lives in `src/models.ts`. Run `pnpm generate:types` for API types and `pnpm generate:models` for model IDs instead of editing those files by hand.
-
-Known discrepancies in the upstream schema are tracked in [OPENAPI_SCHEMA_ISSUES.md](./OPENAPI_SCHEMA_ISSUES.md).
 
 ## License
 

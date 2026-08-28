@@ -10,3 +10,4 @@ coverage
 .idea
 .env
 .investigation
+OPENAPI_SCHEMA_ISSUES.md

@@ -4,6 +4,8 @@ type ErrorInit = {
   requestId?: string | null;
   status?: number;
   code?: string | null;
+  param?: string | null;
+  type?: string | null;
   body?: unknown;
   cause?: unknown;
 };
@@ -12,6 +14,8 @@ export class APIError extends Error {
   readonly requestId: string | null;
   readonly status: number | undefined;
   readonly code: string | null;
+  readonly param: string | null;
+  readonly type: string | null;
   readonly body: unknown;
   readonly [BRAND] = true as const;
 
@@ -21,6 +25,8 @@ export class APIError extends Error {
     this.requestId = init.requestId ?? null;
     this.status = init.status;
     this.code = init.code ?? null;
+    this.param = init.param ?? null;
+    this.type = init.type ?? null;
     this.body = init.body;
     Object.defineProperty(this, "body", {
       value: init.body,
@@ -160,6 +166,8 @@ export async function errorFromResponse(res: Response, body?: unknown): Promise<
   }
   let message = res.statusText || `HTTP ${res.status}`;
   let code: string | null = null;
+  let param: string | null = null;
+  let type: string | null = null;
   if (parsed && typeof parsed === "object") {
     const obj = parsed as Record<string, unknown>;
     const err = (obj.error && typeof obj.error === "object" ? obj.error : obj) as Record<
@@ -169,10 +177,18 @@ export async function errorFromResponse(res: Response, body?: unknown): Promise<
     if (typeof err.message === "string") message = err.message;
     if (typeof err.code === "string") code = err.code;
     else if (typeof err.code === "number") code = String(err.code);
+    if (typeof err.param === "string") param = err.param;
+    if (typeof err.type === "string") type = err.type;
   } else if (typeof parsed === "string" && parsed.length > 0) {
     message = parsed;
   }
-  return errorFromStatus(statusOf(res), message, { requestId, code, body: parsed });
+  return errorFromStatus(statusOf(res), message, {
+    requestId,
+    code,
+    param,
+    type,
+    body: parsed,
+  });
 }
 
 function statusOf(res: Response): number {
@@ -233,24 +249,33 @@ export function streamErrorEvent(
   raw: Record<string, unknown>,
   requestId: string | null,
 ): { event: Record<string, unknown>; error: APIError } {
-  const codeRaw = raw.code;
-  const codeNum = typeof codeRaw === "number" ? codeRaw : Number.parseInt(String(codeRaw ?? ""), 10);
-  const message = typeof raw.message === "string" ? raw.message : "Stream error";
+  const details =
+    raw.error && typeof raw.error === "object" && !Array.isArray(raw.error)
+      ? (raw.error as Record<string, unknown>)
+      : raw;
+  const codeRaw = details.code ?? raw.code;
+  const statusRaw = raw.status ?? details.status;
+  const statusNum =
+    typeof statusRaw === "number"
+      ? statusRaw
+      : Number.parseInt(String(statusRaw ?? codeRaw ?? ""), 10);
+  const message =
+    typeof details.message === "string"
+      ? details.message
+      : typeof raw.message === "string"
+        ? raw.message
+        : "Stream error";
+  const code = codeRaw != null ? String(codeRaw) : null;
+  const param = typeof details.param === "string" ? details.param : null;
+  const type = typeof details.type === "string" ? details.type : null;
+  const init = { requestId, code, param, type, body: raw };
   let error: APIError;
-  if (codeNum === 529 || /overloaded/i.test(message)) {
-    error = new OverloadedError(message, { requestId, code: codeRaw != null ? String(codeRaw) : "529" });
-  } else if (codeNum >= 400 && codeNum < 600) {
-    error = errorFromStatus(codeNum, message, {
-      requestId,
-      code: codeRaw != null ? String(codeRaw) : null,
-      body: raw,
-    });
+  if (statusNum === 529 || /overloaded/i.test(message)) {
+    error = new OverloadedError(message, { ...init, code: code ?? "529" });
+  } else if (statusNum >= 400 && statusNum < 600) {
+    error = errorFromStatus(statusNum, message, init);
   } else {
-    error = new APIError(message, {
-      requestId,
-      code: codeRaw != null ? String(codeRaw) : null,
-      body: raw,
-    });
+    error = new APIError(message, init);
   }
   return { event: { ...raw, type: "error", error }, error };
 }

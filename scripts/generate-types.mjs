@@ -79,10 +79,16 @@ async function main() {
   const ref = specRef();
   console.error(`generate:types ${ref}`);
   const { file, sourceHash } = await loadSpec(ref);
-  const child = spawn(process.execPath, [CLI, file, "-o", OUT], {
-    cwd: ROOT,
-    stdio: "inherit",
-  });
+  // OpenAPI defaults describe server behavior; they do not make request
+  // properties required. Preserve the document's explicit `required` lists.
+  const child = spawn(
+    process.execPath,
+    [CLI, file, "-o", OUT, "--default-non-nullable", "false"],
+    {
+      cwd: ROOT,
+      stdio: "inherit",
+    },
+  );
   const code = await new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("exit", (status, signal) => {

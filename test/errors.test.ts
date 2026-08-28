@@ -55,6 +55,26 @@ describe("typed errors", () => {
     }
   });
 
+  it("exposes structured error details", async () => {
+    try {
+      await client(400, {
+        error: {
+          type: "invalid_request_error",
+          code: "invalid_model",
+          param: "model",
+          message: "Unknown model",
+        },
+      }).responses.create(createBody);
+      throw new Error("expected failure");
+    } catch (err) {
+      expect(APIError.is(err)).toBe(true);
+      expect((err as APIError).type).toBe("invalid_request_error");
+      expect((err as APIError).code).toBe("invalid_model");
+      expect((err as APIError).param).toBe("model");
+      expect((err as APIError).message).toBe("Unknown model");
+    }
+  });
+
   it("rewrites 400 dropped-reasoning messages", async () => {
     try {
       await client(400, { error: { message: "missing encrypted reasoning content" } }).responses.create(

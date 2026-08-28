@@ -3,36 +3,56 @@ import type { ModelId } from "./models.js";
 
 type Schema = components["schemas"];
 type GeneratedTool = Schema["ModelTool"];
-type GeneratedWebSearchTool = Extract<GeneratedTool, { type: "web_search" }>;
+type GeneratedFunctionTool = Extract<GeneratedTool, { type: "function" }>;
+type ImageDetail = "auto" | "low" | "high";
 
 export type OutputItem = Schema["ModelOutput"];
+export type OutputMessage = Omit<Schema["OutputMessage"], "role" | "type"> & {
+  role: "assistant" | "tool";
+  type: "message";
+};
+export type FunctionToolCall = Omit<Schema["FunctionToolCall"], "type"> & {
+  type: "function_call";
+};
+export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
+  type: "reasoning";
+};
 export type IncompleteDetails = Schema["IncompleteDetails"];
 export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
 export type InputItemList = Schema["ListInputItemsResponse"];
 export type Model = Schema["Model"];
 export type ModelList = Schema["ListModelsResponse"];
 export type Tool =
-  | Exclude<GeneratedTool, GeneratedWebSearchTool>
-  | (Omit<GeneratedWebSearchTool, "search_context_size"> & {
-      search_context_size?: GeneratedWebSearchTool["search_context_size"];
+  | Exclude<GeneratedTool, GeneratedFunctionTool>
+  | (Omit<GeneratedFunctionTool, "parameters"> & {
+      parameters: Record<string, unknown>;
     });
 
 /** Client-only: inlined to `image_url` before send. */
 type ImageBlobPart = {
   type: "input_image";
   image: Blob | File;
-  detail?: "auto" | "low" | "high";
+  detail?: ImageDetail;
+};
+
+/** The API also accepts image detail for URL and data-URL inputs. */
+type ImageUrlPart = {
+  type: "input_image";
+  image_url: string;
+  file_id?: string | null;
+  detail?: ImageDetail;
 };
 
 export type InputItem =
   | Schema["ModelInputPart"]
   | {
       role: string;
-      content: string | Array<Schema["ModelInputContentItem"] | ImageBlobPart>;
+      content: string | Array<Schema["ModelInputContentItem"] | ImageBlobPart | ImageUrlPart>;
     };
 
-export type CreateParams = Partial<
-  Omit<Schema["ModelRequest"], "input" | "model" | "store" | "stream" | "tools">
+export type CreateParams = Omit<
+  Schema["ModelRequest"],
+  "input" | "model" | "store" | "stream" | "tools"
 > & {
   model: ModelId;
   input: string | InputItem[];

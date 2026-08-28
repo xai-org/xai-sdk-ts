@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TimeoutError, xAI } from "../src/index.js";
+import { APIError, TimeoutError, xAI } from "../src/index.js";
 import { completedResponse, createBody, mockFetch, sseResponse, usageFixture } from "./helpers.js";
 
 describe("responses.create stream", () => {
@@ -114,6 +114,34 @@ describe("responses.create stream", () => {
       error?: { isOverloaded: () => boolean };
     };
     expect(errEvent?.error?.isOverloaded()).toBe(true);
+    expect(stream.status).toBe("failed");
+  });
+
+  it("normalizes nested stream error details", async () => {
+    const { fetch } = mockFetch(() =>
+      sseResponse([
+        {
+          type: "error",
+          status: 400,
+          error: {
+            type: "invalid_request_error",
+            code: "previous_response_not_found",
+            param: "previous_response_id",
+            message: "Previous response not found",
+          },
+        },
+      ]),
+    );
+    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const stream = await client.responses.create({ ...createBody, stream: true });
+    let error: APIError | undefined;
+    for await (const event of stream) {
+      if (event.type === "error") error = event.error;
+    }
+    expect(error?.status).toBe(400);
+    expect(error?.type).toBe("invalid_request_error");
+    expect(error?.code).toBe("previous_response_not_found");
+    expect(error?.param).toBe("previous_response_id");
     expect(stream.status).toBe("failed");
   });
 
