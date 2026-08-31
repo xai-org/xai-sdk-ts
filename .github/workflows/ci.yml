@@ -59,13 +59,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install pnpm and Node.js
+      - name: Install pnpm
         uses: pnpm/setup@bf5bfae7d43e2b2b1191383f5005cd3fb69b848d # v2.0.2
         with:
-          runtime: node@22.13.0
           cache: true
           cache-dependency-path: pnpm-lock.yaml
           install: false
+
+      - name: Install Node.js and npm
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.13.0
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
