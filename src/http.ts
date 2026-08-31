@@ -8,6 +8,7 @@ import {
   RETRYABLE_STATUS,
   SDK_USER_AGENT,
 } from "./constants.js";
+import { apiKeyFor } from "./credentials.js";
 import { debugEnabled, isNode, sdkLanguage } from "./env.js";
 import { SDK_VERSION } from "./version.js";
 import {
@@ -70,10 +71,8 @@ export function formatCurl(method: string, url: string, headers: Headers, body?:
   headers.forEach((value, key) => {
     lines.push(`  -H '${escapeSingle(`${key}: ${redactHeader(key, value)}`)}'`);
   });
-  if (body !== undefined) {
-    lines.push(`  -d '${escapeSingle(body)}'`);
-  }
-  return lines.join(" \\\n");
+  const command = lines.join(" \\\n");
+  return body === undefined ? command : `${command}\n# Request body omitted because it may contain sensitive data.`;
 }
 
 function escapeSingle(value: string): string {
@@ -145,7 +144,7 @@ function buildHeaders(client: xAI, opts: RequestOpts | undefined, stream: boolea
   if (opts?.headers) {
     new Headers(opts.headers).forEach((v, k) => headers.set(k, v));
   }
-  if (!headers.has("authorization")) headers.set("authorization", `Bearer ${client.apiKey}`);
+  if (!headers.has("authorization")) headers.set("authorization", `Bearer ${apiKeyFor(client)}`);
   if (hasBody && !headers.has("content-type")) headers.set("content-type", "application/json");
   if (!headers.has("accept")) headers.set("accept", stream ? "text/event-stream" : "application/json");
   if (isNode() && !headers.has("user-agent")) headers.set("user-agent", SDK_USER_AGENT);

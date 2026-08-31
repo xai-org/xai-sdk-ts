@@ -9,5 +9,8 @@ coverage
 .vscode
 .idea
 .env
+.env.*
+!.env.example
+.aws
+.npmrc
 .investigation
-OPENAPI_SCHEMA_ISSUES.md

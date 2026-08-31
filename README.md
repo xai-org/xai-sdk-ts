@@ -22,6 +22,8 @@
 
 Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, multi-turn conversations, and access to usage and HTTP metadata.
 
+This repository contains client code for the public xAI API. It does not contain model implementations or other confidential xAI systems. Contributions must contain only information and code that may be released publicly.
+
 ## Requirements
 
 - Node.js 22.13 or later
@@ -459,13 +461,13 @@ The SDK exports `APIConnectionError`, `APIProtocolError`, `APIStatusError`, `Abo
 
 ## Debugging requests
 
-Set `XAI_DEBUG=1` to print each request as a reproducible cURL command:
+Set `XAI_DEBUG=1` to print each request's method, URL, and headers as a cURL command:
 
 ```bash
 XAI_DEBUG=1 node app.js
 ```
 
-Authentication headers and common credential fields are redacted. Request bodies are not, so avoid debug logging where prompts or tool outputs may contain sensitive data.
+Authentication headers and common credential fields are redacted. Request bodies are always omitted because prompts and tool outputs may contain sensitive data.
 
 Structured API failures expose `error.type`, `error.code`, and `error.param` when the server returns them. The xAI request ID is also available at `response.http.requestId` and `error.requestId`. Include it when reporting an API problem.
 
@@ -475,17 +477,15 @@ Install dependencies and run the checks:
 
 ```bash
 pnpm install
-pnpm test
-pnpm typecheck
-pnpm lint
-pnpm build
+pnpm check
 pnpm pack:check
+pnpm pack:smoke
 ```
 
-Check the package from a clean temporary install:
+Run every release gate, including the dependency audit:
 
 ```bash
-pnpm pack:smoke
+pnpm release:check
 ```
 
 Create a distributable tarball and SHA-256 checksum in `artifacts/`:
@@ -495,6 +495,12 @@ pnpm pack:artifact
 ```
 
 Generated API types live in `src/generated/types.ts`, and the model ID union lives in `src/models.ts`. Run `pnpm generate:types` for API types and `pnpm generate:models` for model IDs instead of editing those files by hand.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request. By contributing, you agree to the [xAI Contributor License Agreement](./CLA.md).
+
+Report suspected vulnerabilities privately as described in [SECURITY.md](./SECURITY.md). Do not include credentials, confidential data, or unredacted request bodies in public issues.
 
 ## License
 

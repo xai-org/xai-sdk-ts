@@ -32,7 +32,7 @@ describe("http helpers", () => {
     expect(delay).toBeLessThanOrEqual(60_000);
   });
 
-  it("redacts secret headers and URL userinfo in XAI_DEBUG curl", () => {
+  it("redacts credentials and omits request bodies in XAI_DEBUG curl", () => {
     const headers = new Headers({
       authorization: "Bearer secret-key",
       cookie: "sid=abc",
@@ -46,7 +46,7 @@ describe("http helpers", () => {
       "POST",
       `https://${userinfo}@api.x.ai/v1/responses?api_key=leak`,
       headers,
-      "{}",
+      '{"prompt":"sensitive-prompt"}',
     );
     expect(curl).toContain("Bearer [REDACTED]");
     expect(curl).toContain("cookie: [REDACTED]");
@@ -57,6 +57,8 @@ describe("http helpers", () => {
     expect(curl).not.toContain("sid=abc");
     expect(curl).toContain("[REDACTED]");
     expect(curl).toContain("accept: application/json");
+    expect(curl).toContain("Request body omitted");
+    expect(curl).not.toContain("sensitive-prompt");
   });
 });
 
@@ -223,12 +225,12 @@ describe("http send", () => {
     expect(res.http.status).toBe(204);
   });
 
-  it("keeps apiKey off enumerable inspect output", () => {
+  it("does not expose apiKey on the client or inspect output", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     const client = new xAI({ apiKey: "super-secret", fetch });
     expect(Object.keys(client)).not.toContain("apiKey");
+    expect("apiKey" in client).toBe(false);
     expect(inspect(client)).not.toContain("super-secret");
-    expect(client.apiKey).toBe("super-secret");
   });
 
   it("does not copy __proto__ from wire JSON onto the response instance", async () => {

@@ -5,6 +5,7 @@ import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_TIMEOUT_MS,
 } from "./constants.js";
+import { storeApiKey } from "./credentials.js";
 import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
@@ -26,8 +27,6 @@ export class xAI {
   readonly responses: Responses;
   readonly models: ModelsResource;
 
-  #apiKey: string;
-
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
     if (isBrowser() && !opts.dangerouslyAllowBrowser) {
@@ -44,7 +43,7 @@ export class xAI {
           : "xAI: pass apiKey from a server; do not use a secret API key in browsers or Workers",
       );
     }
-    this.#apiKey = apiKey;
+    storeApiKey(this, apiKey);
     this.baseURL = (opts.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.timeout = opts.timeout ?? DEFAULT_TIMEOUT_MS;
     this.idleTimeout = opts.idleTimeout ?? DEFAULT_IDLE_TIMEOUT_MS;
@@ -57,10 +56,6 @@ export class xAI {
     this.onResponse = opts.onResponse;
     this.responses = new Responses(this);
     this.models = new ModelsResource(this);
-  }
-
-  get apiKey(): string {
-    return this.#apiKey;
   }
 
   [INSPECT](): object {

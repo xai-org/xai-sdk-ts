@@ -1,6 +1,62 @@
 packages: []
 
 engineStrict: true
+blockExoticSubdeps: true
+minimumReleaseAge: 10080
+# These exact versions were already integrity-locked and reviewed before the
+# seven-day policy was enabled. pnpm prunes stale version exceptions.
+minimumReleaseAgeExclude:
+  - '@oxlint/binding-android-arm-eabi@1.80.0'
+  - '@oxlint/binding-android-arm64@1.80.0'
+  - '@oxlint/binding-darwin-arm64@1.80.0'
+  - '@oxlint/binding-darwin-x64@1.80.0'
+  - '@oxlint/binding-freebsd-x64@1.80.0'
+  - '@oxlint/binding-linux-arm-gnueabihf@1.80.0'
+  - '@oxlint/binding-linux-arm-musleabihf@1.80.0'
+  - '@oxlint/binding-linux-arm64-gnu@1.80.0'
+  - '@oxlint/binding-linux-arm64-musl@1.80.0'
+  - '@oxlint/binding-linux-ppc64-gnu@1.80.0'
+  - '@oxlint/binding-linux-riscv64-gnu@1.80.0'
+  - '@oxlint/binding-linux-riscv64-musl@1.80.0'
+  - '@oxlint/binding-linux-s390x-gnu@1.80.0'
+  - '@oxlint/binding-linux-x64-gnu@1.80.0'
+  - '@oxlint/binding-linux-x64-musl@1.80.0'
+  - '@oxlint/binding-openharmony-arm64@1.80.0'
+  - '@oxlint/binding-win32-arm64-msvc@1.80.0'
+  - '@oxlint/binding-win32-ia32-msvc@1.80.0'
+  - '@oxlint/binding-win32-x64-msvc@1.80.0'
+  - '@rollup/rollup-android-arm-eabi@4.63.0'
+  - '@rollup/rollup-android-arm64@4.63.0'
+  - '@rollup/rollup-darwin-arm64@4.63.0'
+  - '@rollup/rollup-darwin-x64@4.63.0'
+  - '@rollup/rollup-freebsd-arm64@4.63.0'
+  - '@rollup/rollup-freebsd-x64@4.63.0'
+  - '@rollup/rollup-linux-arm-gnueabihf@4.63.0'
+  - '@rollup/rollup-linux-arm-musleabihf@4.63.0'
+  - '@rollup/rollup-linux-arm64-gnu@4.63.0'
+  - '@rollup/rollup-linux-arm64-musl@4.63.0'
+  - '@rollup/rollup-linux-loong64-gnu@4.63.0'
+  - '@rollup/rollup-linux-loong64-musl@4.63.0'
+  - '@rollup/rollup-linux-ppc64-gnu@4.63.0'
+  - '@rollup/rollup-linux-ppc64-musl@4.63.0'
+  - '@rollup/rollup-linux-riscv64-gnu@4.63.0'
+  - '@rollup/rollup-linux-riscv64-musl@4.63.0'
+  - '@rollup/rollup-linux-s390x-gnu@4.63.0'
+  - '@rollup/rollup-linux-x64-gnu@4.63.0'
+  - '@rollup/rollup-linux-x64-musl@4.63.0'
+  - '@rollup/rollup-openbsd-x64@4.63.0'
+  - '@rollup/rollup-openharmony-arm64@4.63.0'
+  - '@rollup/rollup-win32-arm64-msvc@4.63.0'
+  - '@rollup/rollup-win32-ia32-msvc@4.63.0'
+  - '@rollup/rollup-win32-x64-gnu@4.63.0'
+  - '@rollup/rollup-win32-x64-msvc@4.63.0'
+  - 'oxlint@1.80.0'
+  - 'picomatch@4.0.7'
+  - 'rollup@4.63.0'
+trustPolicy: no-downgrade
+# This integrity-locked legacy release predates stronger publisher metadata.
+trustPolicyExclude:
+  - 'undici-types@6.21.0'
 
 allowBuilds:
   esbuild: true
