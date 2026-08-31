@@ -21,7 +21,7 @@ env:
 jobs:
   test:
     name: test (Node ${{ matrix.node-version }})
-    runs-on: ubuntu-24.04
+    runs-on: cpu-micro-amd64-onprem
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -51,7 +51,7 @@ jobs:
 
   release-checks:
     name: release checks
-    runs-on: ubuntu-24.04
+    runs-on: cpu-micro-amd64-onprem
     timeout-minutes: 20
     steps:
       - name: Checkout
