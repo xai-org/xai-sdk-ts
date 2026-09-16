@@ -1,0 +1,84 @@
+{
+  "name": "@xai-official/sdk",
+  "version": "0.1.0-internal.3",
+  "description": "The official TypeScript SDK for the xAI API",
+  "keywords": [
+    "xai",
+    "grok",
+    "ai",
+    "sdk",
+    "typescript"
+  ],
+  "license": "Apache-2.0",
+  "author": "xAI <support@x.ai>",
+  "type": "module",
+  "packageManager": "pnpm@11.24.0+sha512.bd27e345e976dcb0be0b7a1228217b049a817e21b1f355c90dbe7dc46671895a8bc1e6d06c24554505ea93ea0b45f489a27ec1bfbc8de6a9659fca0f16fa0000",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.ts",
+      "default": "./dist/tools.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "homepage": "https://github.com/xai-org/xai-sdk-ts",
+  "bugs": {
+    "url": "https://github.com/xai-org/xai-sdk-ts/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xai-org/xai-sdk-ts.git"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "internal"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-types.mjs",
+    "generate:types": "node scripts/generate-types.mjs",
+    "generate:models": "node scripts/generate-models.mjs",
+    "generate:voice": "node scripts/generate-voice.mjs",
+    "generate:version": "node scripts/generate-version.mjs",
+    "build": "node scripts/build.mjs",
+    "lint": "oxlint --deny-warnings src test scripts",
+    "pack:artifact": "node scripts/pack-artifact.mjs",
+    "pack:check": "publint && attw --pack . --profile esm-only",
+    "pack:smoke": "node scripts/test-package.mjs",
+    "clean": "node scripts/clean.mjs",
+    "prepare": "node scripts/prepare.mjs",
+    "prepack": "node scripts/build.mjs",
+    "test:coverage": "vitest run --coverage",
+    "test:live": "node scripts/build.mjs && node --env-file-if-exists=.env scripts/test-live.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm test:coverage && pnpm typecheck && pnpm lint && pnpm build",
+    "release:check": "pnpm check && pnpm pack:check && pnpm pack:smoke && pnpm audit --audit-level=low",
+    "prepublishOnly": "pnpm release:check"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "22.15.29",
+    "@vitest/coverage-v8": "4.1.11",
+    "openapi-typescript": "7.10.1",
+    "oxlint": "1.80.0",
+    "publint": "0.3.24",
+    "typescript": "5.8.3",
+    "vitest": "4.1.11"
+  }
+}

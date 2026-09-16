@@ -1,0 +1,69 @@
+name: Bug report
+description: Report a problem with the xAI TypeScript SDK
+title: "[BUG] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for SDK client behavior. Contact xAI support for account, quota, billing, model output, or server-side API issues.
+        Remove API keys, prompts, customer data, and other sensitive information before submitting.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: This issue is caused by the TypeScript SDK rather than model output or an account/server-side problem.
+          required: true
+        - label: I removed credentials, confidential data, and unredacted request bodies.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest safe example that reproduces the problem.
+      render: typescript
+    validations:
+      required: true
+
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: 22.13.0
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Package manager and operating system
+      placeholder: pnpm 11.24.0 on macOS 15
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Include only logs that contain no credentials, prompts, customer data, or other sensitive information.
+      render: shell

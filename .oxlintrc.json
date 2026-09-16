@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["src/generated/**", "src/models.ts"],
+  "rules": {
+    "typescript/array-type": ["error", { "default": "generic", "readonly": "generic" }]
+  }
+}
