@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "xai-api-key"
+description = "xAI API key"
+regex = '''(?i)xai-[a-z0-9]{20,80}'''
+tags = ["api-key", "xai"]
+
+[[rules]]
+id = "xai-management-api-key"
+description = "xAI management API key"
+regex = '''(?i)xai-token-[a-z0-9]{20,80}'''
+tags = ["api-key", "xai"]
