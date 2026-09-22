@@ -459,6 +459,63 @@ const result = await client.images.edit({
 });
 ```
 
+## Video generation
+
+Video generation runs as a background job. `generate()` starts the job and returns its `request_id`, and `wait()` polls until the job finishes:
+
+```ts
+const { request_id } = await client.videos.generate({
+  model: "grok-imagine-video-1.5",
+  prompt: "A paper boat drifting down a rain-soaked street",
+  duration: 8,
+  aspect_ratio: "16:9",
+  resolution: "720p",
+});
+
+const result = await client.videos.wait(request_id);
+if (result.status === "done") {
+  console.log(result.video?.url);
+  console.log(result.usage?.cost_usd);
+} else {
+  console.error(result.status, result.error?.code, result.error?.message);
+}
+```
+
+`wait()` resolves once the status is no longer `pending`: `done`, `failed`, or `expired`. A failed result includes an `error` with a `code` and `message`. If `video.respect_moderation` is `false`, the video did not pass moderation and has no URL. Video URLs are temporary, so download the file promptly.
+
+`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError` but does not cancel the job, so you can call `wait()` again. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
+
+To animate a still image, pass it as `image`. `image`, `reference_images`, and keyframe images accept a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
+
+```ts
+import { openAsBlob } from "node:fs";
+
+const { request_id } = await client.videos.generate({
+  model: "grok-imagine-video-1.5",
+  prompt: "Make the water crash down and slowly pan out the camera",
+  image: await openAsBlob("./waterfall.png"),
+});
+```
+
+Edit a video with `edit()`, or continue it from its last frame with `extend()`. Both return a `request_id` for `wait()`. The source `video` must be an MP4, given as a public URL, a base64 data URL, or a Files API `file_id`. For extensions, `duration` sets the length of the new segment only:
+
+```ts
+const edit = await client.videos.edit({
+  model: "grok-imagine-video",
+  prompt: "Give the woman a silver necklace",
+  video: { url: "https://example.com/portrait.mp4" },
+});
+
+const extension = await client.videos.extend({
+  model: "grok-imagine-video",
+  prompt: "The camera slowly zooms out to reveal the city skyline",
+  video: { file_id: "file_abc123" },
+  duration: 6,
+});
+```
+
+List the video generation models available to your API key with `client.videos.models.list()`, or look one up by ID with `client.videos.models.get()`.
+
 ## Models
 
 Use model IDs directly. `ModelId` suggests known string literals while still accepting models released after the installed SDK version:

@@ -11,6 +11,9 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - Image generation and editing with `client.images.generate()` and `client.images.edit()`, including multi-image edits and `Blob` or `File` source images.
 - Image generation model lookup with `client.images.models.list()` and `client.images.models.get()`.
 - `isImageGenerationCall` and typed `response.image_generation_call.*` stream events for the Responses API image generation tool.
+- Video generation, image-to-video, editing, and extension with `client.videos.generate()`, `client.videos.edit()`, and `client.videos.extend()`, including `Blob` or `File` image inputs.
+- `client.videos.get()` to check a video request and `client.videos.wait()` to poll it until it is no longer pending, with `interval`, `timeout`, and `signal` options.
+- Video generation model lookup with `client.videos.models.list()` and `client.videos.models.get()`.
 
 ### Changed
 

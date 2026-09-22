@@ -10,6 +10,7 @@ import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
 import { Images } from "./resources/images.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
+import { Videos } from "./resources/videos.js";
 import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
 
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
@@ -28,6 +29,7 @@ export class xAI {
   readonly responses: Responses;
   readonly models: ModelsResource;
   readonly images: Images;
+  readonly videos: Videos;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -59,6 +61,7 @@ export class xAI {
     this.responses = new Responses(this);
     this.models = new ModelsResource(this);
     this.images = new Images(this);
+    this.videos = new Videos(this);
   }
 
   [INSPECT](): object {

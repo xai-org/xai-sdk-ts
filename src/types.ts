@@ -1,5 +1,5 @@
 import type { components } from "./generated/types.js";
-import type { ImageModelId, ModelId } from "./models.js";
+import type { ImageModelId, ModelId, VideoModelId } from "./models.js";
 import type { MediaUsage } from "./usage.js";
 
 type Schema = components["schemas"];
@@ -107,6 +107,45 @@ export type ImageResponse = Omit<Schema["GeneratedImageResponse"], "usage"> & {
 };
 export type ImageGenerationModel = Schema["ImageGenerationModel"];
 export type ImageGenerationModelList = Schema["ListImageGenerationModelsResponse"];
+
+type VideoKeyframe = Omit<Schema["VideoKeyframe"], "image"> & { image: ImageInput };
+
+export type VideoGenerateParams = Omit<
+  Schema["GenerateVideoRequest"],
+  "model" | "image" | "reference_images" | "keyframes"
+> & {
+  model: VideoModelId;
+  image?: ImageInput | null;
+  reference_images?: ImageInput[];
+  keyframes?: VideoKeyframe[];
+};
+
+export type VideoEditParams = Omit<Schema["EditVideoRequest"], "model"> & {
+  model: VideoModelId;
+};
+
+export type VideoExtendParams = Omit<Schema["ExtendVideoRequest"], "model"> & {
+  model: VideoModelId;
+};
+
+export type VideoStartResponse = Schema["StartDeferredResponse"];
+export type GeneratedVideo = Schema["GeneratedVideo"];
+/** `status` is `pending`, `done`, `failed`, or `expired`. */
+export type VideoResponse = Omit<Schema["VideoResponse"], "usage"> & {
+  usage: MediaUsage | null;
+  http: HttpMeta;
+};
+
+export type VideoWaitOptions = {
+  /** Milliseconds between polls. Defaults to 5000. */
+  interval?: number;
+  /** Maximum total wait in milliseconds. Defaults to 600000 (10 minutes). */
+  timeout?: number;
+  signal?: AbortSignal;
+};
+
+export type VideoGenerationModel = Schema["VideoGenerationModel"];
+export type VideoGenerationModelList = Schema["ListVideoGenerationModelsResponse"];
 
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
