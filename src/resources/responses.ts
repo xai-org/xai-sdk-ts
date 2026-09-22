@@ -4,8 +4,8 @@ import { APIProtocolError } from "../errors.js";
 import { xAIResponse } from "../response.js";
 import { xAIStream } from "../stream.js";
 import { requireRecord } from "./shared.js";
-import type { CreateParams, RequestOpts } from "../types.js";
-import type { DeletedResponse, InputItemList } from "../types.js";
+import type { CompactParams, CreateParams, RequestOpts } from "../types.js";
+import type { CompactResponse, DeletedResponse, InputItemList } from "../types.js";
 import type { xAI } from "../client.js";
 
 export class Responses {
@@ -43,6 +43,27 @@ export class Responses {
       });
     }
     return new xAIResponse(result.payload, result.http);
+  }
+
+  async compact(
+    body: CompactParams,
+    opts?: RequestOpts,
+  ): Promise<CompactResponse & { http: import("../types.js").HttpMeta }> {
+    const input = await inlineBlobs(body.input, opts?.signal);
+    const result = await send(this.client, {
+      method: "POST",
+      path: "/responses/compact",
+      body: { ...body, input },
+      opts,
+    });
+    const compacted = requireRecord(result.payload, result.http.requestId, "Compact response");
+    if (typeof compacted.id !== "string" || !Array.isArray(compacted.output)) {
+      throw new APIProtocolError("Compact response is missing id or output", {
+        requestId: result.http.requestId,
+        body: compacted,
+      });
+    }
+    return { ...(compacted as CompactResponse), http: result.http };
   }
 
   async get(id: string, opts?: RequestOpts): Promise<xAIResponse> {

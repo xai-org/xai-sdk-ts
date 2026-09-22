@@ -19,6 +19,7 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - Batch API support with `client.batches.create()`, `list()`, `get()`, `cancel()`, and `results()`, plus `client.batches.requests.add()` and `client.batches.requests.list()`.
 - `client.batches.wait()` polls a batch until no requests are pending.
 - Batch `responses` requests take the same `CreateParams` as `client.responses.create()`, with the same `Blob` image inlining and `store: false` default.
+- Conversation compaction with `client.responses.compact()`, which returns a single encrypted item to start the next request's input, plus the `CompactParams` and `CompactResponse` types.
 
 ### Changed
 

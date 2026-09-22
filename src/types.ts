@@ -69,6 +69,12 @@ export type CreateParams = Omit<
   store?: boolean | null;
 };
 
+export type CompactParams = Omit<Schema["CompactRequest"], "input" | "model"> & {
+  model: ModelId;
+  input: string | InputItem[];
+};
+export type CompactResponse = Schema["CompactResponse"];
+
 /** Blob and File values are client-only: inlined to a `url` data URL before send. */
 export type ImageInput = Schema["ImageUrl"] | Blob | File;
 

@@ -45,6 +45,8 @@ export type {
   BatchResultList,
   BatchWaitOptions,
   ClientOptions,
+  CompactParams,
+  CompactResponse,
   CreateParams,
   DeletedFile,
   DeletedResponse,

@@ -142,6 +142,35 @@ const second = await client.responses.create({
 });
 ```
 
+### Compacting long conversations
+
+Every turn resends the whole conversation, so input tokens grow as it gets longer. Compact the conversation into a single encrypted item with `responses.compact()`, then start the next input with the compacted `output`. Continuing the `toInput()` example:
+
+```ts
+const compacted = await client.responses.compact({
+  model: "grok-4.6",
+  input: [
+    ...input,
+    ...first.toInput(),
+    { role: "user", content: "What is my name?" },
+    ...second.toInput(),
+  ],
+});
+
+const third = await client.responses.create({
+  model: "grok-4.6",
+  input: [
+    ...compacted.output,
+    { role: "user", content: "Spell my name backwards." },
+  ],
+  prompt_cache_key: promptCacheKey,
+});
+
+console.log(third.toText());
+```
+
+Pass `compacted.output` unchanged and add new turns after it. The conversation must still fit in the model's context window when you compact it. `compacted.usage` reports the tokens the compaction used and `dropped_message_count`, the number of messages it replaced.
+
 ## Image input
 
 Pass an image URL alongside text:
