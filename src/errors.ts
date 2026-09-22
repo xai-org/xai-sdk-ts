@@ -175,6 +175,7 @@ export async function errorFromResponse(res: Response, body?: unknown): Promise<
       unknown
     >;
     if (typeof err.message === "string") message = err.message;
+    else if (typeof obj.error === "string") message = obj.error;
     if (typeof err.code === "string") code = err.code;
     else if (typeof err.code === "number") code = String(err.code);
     if (typeof err.param === "string") param = err.param;

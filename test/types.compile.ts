@@ -1,3 +1,4 @@
+import type { KnownStreamEventType } from "../src/constants.js";
 import type {
   CreateParams,
   FunctionToolCall,
@@ -5,10 +6,13 @@ import type {
   OutputMessage,
   ReasoningItem,
   Tool,
+  xAIStreamEvent,
 } from "../src/index.js";
 
 type Assert<T extends true> = T;
 type IsOptional<T, K extends keyof T> = {} extends Pick<T, K> ? true : false;
+type Equals<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 type FunctionTool = Extract<Tool, { type: "function" }>;
 type WebSearchTool = Extract<Tool, { type: "web_search" }>;
@@ -36,6 +40,9 @@ export type FunctionCallHasLiteralType = Assert<
 >;
 export type ReasoningHasLiteralType = Assert<
   ReasoningItem["type"] extends "reasoning" ? true : false
+>;
+export type StreamEventTypesAreKnown = Assert<
+  Equals<KnownStreamEventType, Exclude<xAIStreamEvent["type"], "unknown">>
 >;
 
 export const requestExamples = [

@@ -3,6 +3,7 @@ import { errorFromAbort } from "./errors.js";
 import type {
   CreateParams,
   FunctionToolCall,
+  ImageInput,
   InputItem,
   OutputItem,
   OutputMessage,
@@ -99,6 +100,20 @@ async function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<
   });
 }
 
+function hasBytes(bytes: Uint8Array, offset: number, expected: readonly number[]): boolean {
+  return expected.every((byte, index) => bytes[offset + index] === byte);
+}
+
+/** The API rejects image data URLs that are not typed as JPEG, PNG, or WebP. */
+function sniffImageType(bytes: Uint8Array): string {
+  if (hasBytes(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (hasBytes(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "image/png";
+  if (hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && hasBytes(bytes, 8, [0x57, 0x45, 0x42, 0x50])) {
+    return "image/webp";
+  }
+  return "application/octet-stream";
+}
+
 async function blobToDataUrl(blob: Blob, signal?: AbortSignal): Promise<string> {
   assertNotAborted(signal);
   const bytes = new Uint8Array(await abortable(blob.arrayBuffer(), signal));
@@ -109,7 +124,8 @@ async function blobToDataUrl(blob: Blob, signal?: AbortSignal): Promise<string> 
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   const b64 = btoa(binary);
-  const mime = blob.type || "application/octet-stream";
+  const mime =
+    blob.type && blob.type !== "application/octet-stream" ? blob.type : sniffImageType(bytes);
   return `data:${mime};base64,${b64}`;
 }
 
@@ -145,6 +161,13 @@ export async function inlineBlobs(
   assertNotAborted(signal);
   if (typeof input === "string") return input;
   return (await inlineValue(input, signal)) as InputItem[];
+}
+
+export async function inlineImageInput(
+  image: ImageInput,
+  signal?: AbortSignal,
+): Promise<Exclude<ImageInput, Blob>> {
+  return isBlobLike(image) ? { url: await blobToDataUrl(image, signal) } : image;
 }
 
 /**

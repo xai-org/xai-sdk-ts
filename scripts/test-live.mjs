@@ -12,6 +12,13 @@ if (!Number.isFinite(maxCostUsd) || maxCostUsd <= 0) {
   throw new Error("XAI_TEST_MAX_COST_USD must be a positive number");
 }
 
+function reportedCostUsd(label, usage) {
+  if (typeof usage?.cost_usd !== "number") {
+    throw new Error(`${label} did not report a cost, so the cost limit cannot be enforced`);
+  }
+  return usage.cost_usd;
+}
+
 const { xAI } = await import("../dist/index.js");
 const model = process.env.XAI_TEST_MODEL ?? "grok-4.6";
 
@@ -48,7 +55,9 @@ try {
 if (!sawTerminalEvent || stream.status !== "completed" || !stream.toText()) {
   throw new Error(`Streaming smoke failed (status=${stream.status}, id=${stream.id || "missing"})`);
 }
-const reportedCost = (response.usage.cost_usd ?? 0) + (stream.usage.cost_usd ?? 0);
+const reportedCost =
+  reportedCostUsd("Non-streaming smoke", response.usage) +
+  reportedCostUsd("Streaming smoke", stream.usage);
 if (reportedCost > maxCostUsd) {
   throw new Error(`Live smoke reported $${reportedCost}, above $${maxCostUsd} limit`);
 }

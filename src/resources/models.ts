@@ -1,21 +1,8 @@
 import { send } from "../http.js";
 import { APIProtocolError } from "../errors.js";
+import { requireRecord } from "./shared.js";
 import type { Model, ModelList, RequestOpts } from "../types.js";
 import type { xAI } from "../client.js";
-
-function requireRecord(
-  payload: unknown,
-  requestId: string | null,
-  label: string,
-): Record<string, unknown> {
-  if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
-    return payload as Record<string, unknown>;
-  }
-  throw new APIProtocolError(`${label} must be a JSON object`, {
-    requestId,
-    body: payload,
-  });
-}
 
 export class ModelsResource {
   constructor(private readonly client: xAI) {}

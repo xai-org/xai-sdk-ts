@@ -3,23 +3,10 @@ import { send } from "../http.js";
 import { APIProtocolError } from "../errors.js";
 import { xAIResponse } from "../response.js";
 import { xAIStream } from "../stream.js";
+import { requireRecord } from "./shared.js";
 import type { CreateParams, RequestOpts } from "../types.js";
 import type { DeletedResponse, InputItemList } from "../types.js";
 import type { xAI } from "../client.js";
-
-function requireRecord(
-  payload: unknown,
-  requestId: string | null,
-  label: string,
-): Record<string, unknown> {
-  if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
-    return payload as Record<string, unknown>;
-  }
-  throw new APIProtocolError(`${label} must be a JSON object`, {
-    requestId,
-    body: payload,
-  });
-}
 
 export class Responses {
   readonly inputItems: InputItems;

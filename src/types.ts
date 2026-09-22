@@ -67,6 +67,9 @@ export type CreateParams = Omit<
   store?: boolean | null;
 };
 
+/** Blob and File values are client-only: inlined to a `url` data URL before send. */
+export type ImageInput = Schema["ImageUrl"] | Blob | File;
+
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
 export type ResponseHook = (response: Response) => void | Promise<void>;

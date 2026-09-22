@@ -75,6 +75,18 @@ describe("typed errors", () => {
     }
   });
 
+  it("uses a string error field as the message", async () => {
+    const message = "Public URLs are not supported for files with content type 'text/plain'.";
+    try {
+      await client(400, { code: "invalid-argument", error: message }).responses.create(createBody);
+      throw new Error("expected failure");
+    } catch (err) {
+      expect(APIError.is(err)).toBe(true);
+      expect((err as APIError).code).toBe("invalid-argument");
+      expect((err as APIError).message).toBe(message);
+    }
+  });
+
   it("rewrites 400 dropped-reasoning messages", async () => {
     try {
       await client(400, { error: { message: "missing encrypted reasoning content" } }).responses.create(

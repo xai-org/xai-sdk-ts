@@ -167,7 +167,7 @@ const response = await client.responses.create({
 console.log(response.toText());
 ```
 
-For a local image, pass a `Blob` or `File` as `image`. The SDK converts it to a data URL before sending the request.
+For a local image, pass a `Blob` or `File` as `image`. The SDK converts it to a data URL before sending the request, and detects JPEG, PNG, or WebP from the bytes when the `Blob` has no MIME type.
 
 ```ts
 import { readFile } from "node:fs/promises";

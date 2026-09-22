@@ -36,6 +36,22 @@ describe("responses.create stream", () => {
     expect(stream.http.requestId).toBe("req_test");
   });
 
+  it("derives cost_usd from ticks-only usage and keeps unmapped usage fields", async () => {
+    const contextDetails = { input_tokens: 32, output_tokens: 119 };
+    const usage = { ...usageFixture, cost_in_nano_usd: undefined, context_details: contextDetails };
+    const { fetch } = mockFetch(() =>
+      sseResponse([{ type: "response.completed", response: { ...completedResponse, usage } }]),
+    );
+    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const stream = await client.responses.create({ ...createBody, stream: true });
+    for await (const _ of stream) {
+      // drain
+    }
+    expect(stream.usage.cost_usd).toBe(1.5);
+    expect(stream.usage.cost_in_nano_usd).toBeNull();
+    expect(stream.usage.context_details).toEqual(contextDetails);
+  });
+
   it("keeps function-call argument deltas as fragments until output_item.done", async () => {
     const events = [
       {
