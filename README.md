@@ -463,7 +463,7 @@ Structured API failures expose `error.type`, `error.code`, and `error.param` whe
 Install dependencies and run the checks:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 pnpm pack:check
 pnpm pack:smoke
