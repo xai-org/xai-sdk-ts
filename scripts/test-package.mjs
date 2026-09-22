@@ -121,6 +121,9 @@ try {
     const imageResponse = null as ImageResponse | null;
     const imageTool = { type: "image_generation" } satisfies Tool;
     const imageCalls: ImageGenerationCall[] = ([] as OutputItem[]).filter(isImageGenerationCall);
+    void client.voice.speak({ text: "Hi [pause] there.", language: "en" });
+    // @ts-expect-error Unknown speech tags are type errors in string literals.
+    void client.voice.speak({ text: "Hi [luff] there.", language: "en" });
     void [model, futureModel, deleted, functionTool, webSearchTool, params, client];
     void [imageModel, generate, edit, imageResponse, imageTool, imageCalls];
   `);

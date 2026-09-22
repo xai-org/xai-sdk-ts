@@ -48,6 +48,7 @@
     "generate": "node scripts/generate-types.mjs",
     "generate:types": "node scripts/generate-types.mjs",
     "generate:models": "node scripts/generate-models.mjs",
+    "generate:voice": "node scripts/generate-voice.mjs",
     "generate:version": "node scripts/generate-version.mjs",
     "build": "node scripts/build.mjs",
     "lint": "oxlint --deny-warnings src test scripts",

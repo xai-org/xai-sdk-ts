@@ -35,6 +35,14 @@ export type {
   VideoModelId,
 } from "./models.js";
 export type {
+  KnownRealtimeModelId,
+  KnownTranscriptionModelId,
+  KnownVoiceId,
+  RealtimeModelId,
+  TranscriptionModelId,
+  VoiceId,
+} from "./generated/voice.js";
+export type {
   Batch,
   BatchCreateParams,
   BatchList,
@@ -47,8 +55,14 @@ export type {
   ClientOptions,
   CompactParams,
   CompactResponse,
+  ClientSecret,
+  ClientSecretCreateParams,
   CreateParams,
   DeletedFile,
+  CustomVoice,
+  CustomVoiceCreateParams,
+  CustomVoiceList,
+  CustomVoiceUpdateParams,
   DeletedResponse,
   FileContentParams,
   FileListParams,
@@ -81,6 +95,8 @@ export type {
   RequestHook,
   RequestOpts,
   ResponseHook,
+  SpeechParams,
+  SpeechWithTimestamps,
   Tool,
   VideoEditParams,
   VideoExtendParams,
@@ -90,5 +106,9 @@ export type {
   VideoResponse,
   VideoStartResponse,
   VideoWaitOptions,
+  Transcription,
+  TranscriptionParams,
+  Voice,
+  VoiceList,
   xAIStreamEvent,
 } from "./types.js";

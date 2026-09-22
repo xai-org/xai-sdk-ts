@@ -20,6 +20,11 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - `client.batches.wait()` polls a batch until no requests are pending.
 - Batch `responses` requests take the same `CreateParams` as `client.responses.create()`, with the same `Blob` image inlining and `store: false` default.
 - Conversation compaction with `client.responses.compact()`, which returns a single encrypted item to start the next request's input, plus the `CompactParams` and `CompactResponse` types.
+- Text to speech with `client.voice.speak()`, which returns the audio as an `xAIBinaryResponse`, or JSON with base64 audio and per-character timings when `with_timestamps` is true.
+- Speech tag checks for string literals passed to `client.voice.speak()`: unknown tags such as `[laff]` are type errors that suggest the closest tag, and so are wrapping tags that are never closed or closed out of order, because the API accepts both without an error. Text typed as `string` is sent as written, so tags released after the SDK still work.
+- `VoiceId`, `TranscriptionModelId`, and `RealtimeModelId` types, each with a `Known…` variant for strict checks. `voice_id`, the `model` for `client.voice.transcribe()`, and a client secret's `session.model` autocomplete the documented values and accept any other string.
+- Speech to text with `client.voice.transcribe()` for `Blob` or `File` uploads and audio URLs.
+- Built-in voice lookup with `client.voice.voices`, custom voice management with `client.voice.custom`, and client secrets for browser realtime sessions with `client.voice.clientSecrets.create()`.
 
 ### Changed
 

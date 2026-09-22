@@ -27,10 +27,11 @@ Create a branch from `main` and make focused changes with tests and documentatio
 
 ## Generated files
 
-`src/generated/types.ts`, `src/models.ts`, and `src/version.ts` are generated. Do not edit them directly.
+`src/generated/types.ts`, `src/generated/voice.ts`, `src/models.ts`, and `src/version.ts` are generated. Do not edit them directly.
 
 - Run `pnpm generate:types` to refresh OpenAPI types from the public xAI schema.
 - Run `pnpm generate:models` to refresh known public model IDs.
+- Run `pnpm generate:voice` to refresh the speech tags, built-in voice IDs, and voice model IDs from the Voice docs.
 - The build verifies that `src/version.ts` matches `package.json`.
 
 Generated changes must be reviewed like handwritten changes. Include the upstream source and resulting hash in the pull request.

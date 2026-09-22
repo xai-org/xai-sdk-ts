@@ -1,5 +1,7 @@
 import type { components, operations } from "./generated/types.js";
+import type { RealtimeModelId, TranscriptionModelId, VoiceId } from "./generated/voice.js";
 import type { ImageModelId, ModelId, VideoModelId } from "./models.js";
+import type { SpeechText } from "./speech-tags.js";
 import type { MediaUsage } from "./usage.js";
 
 type Schema = components["schemas"];
@@ -256,6 +258,163 @@ export type BatchResult = {
 export type BatchResultList = {
   results: BatchResult[];
   pagination_token?: string | null;
+};
+
+export type SpeechParams<T extends string = string> = {
+  /** Up to 60,000 characters. Can include speech tags such as `[pause]`. */
+  text: SpeechText<T>;
+  /** BCP-47 code such as `en` or `pt-BR`, or `auto`. */
+  language: string;
+  /** A built-in voice such as `eve`, or a custom voice ID. Defaults to `eve`. */
+  voice_id?: VoiceId;
+  output_format?: {
+    codec: "mp3" | "wav" | "pcm" | "mulaw" | "alaw";
+    sample_rate?: number | null;
+    /** MP3 only. */
+    bit_rate?: number | null;
+  };
+  optimize_streaming_latency?: 0 | 1 | 2;
+  text_normalization?: boolean;
+  /** Return JSON with base64 audio and per-character timings instead of audio bytes. */
+  with_timestamps?: boolean;
+  speed?: number;
+  replace?: Record<string, string>;
+};
+
+export type SpeechWithTimestamps = {
+  /** Base64-encoded audio in the requested codec. */
+  audio: string;
+  content_type: string;
+  duration: number;
+  audio_timestamps?: {
+    graph_chars: string[];
+    /** Seconds, aligned by index with `graph_chars`. */
+    graph_times: Array<[start: number, end: number]>;
+  };
+};
+
+export type TranscriptionParams = {
+  model?: TranscriptionModelId;
+  /** Only needed for raw `pcm`, `mulaw`, or `alaw` audio, which also needs `sample_rate`. */
+  audio_format?:
+    | "pcm"
+    | "mulaw"
+    | "alaw"
+    | "wav"
+    | "mp3"
+    | "ogg"
+    | "opus"
+    | "flac"
+    | "aac"
+    | "mp4"
+    | "m4a"
+    | "mkv";
+  sample_rate?: 8000 | 16000 | 22050 | 24000 | 44100 | 48000;
+  language?: string;
+  /** Write spoken numbers, currencies, and units in written form. Requires `language`. */
+  format?: boolean;
+  multichannel?: boolean;
+  channels?: number;
+  diarize?: boolean;
+  keyterm?: string[];
+  filler_words?: boolean;
+  vad_threshold?: number;
+} & ({ file: Blob | File; url?: never } | { url: string; file?: never });
+
+type TranscriptionWord = {
+  text: string;
+  start: number;
+  end: number;
+  confidence?: number;
+  speaker?: number;
+};
+
+export type Transcription = {
+  text: string;
+  language: string;
+  duration: number;
+  words?: TranscriptionWord[];
+  /** Present when `multichannel` is true. */
+  channels?: Array<{
+    index: number;
+    language?: string;
+    text: string;
+    words?: TranscriptionWord[];
+  }>;
+};
+
+export type Voice = {
+  voice_id: string;
+  name: string;
+  language?: string | null;
+};
+
+export type VoiceList = { voices: Voice[] };
+
+type CustomVoiceGender = "male" | "female" | "neutral";
+type CustomVoiceAge = "young" | "middle-aged" | "old";
+
+type CustomVoiceLabels = {
+  name?: string;
+  description?: string;
+  gender?: CustomVoiceGender;
+  accent?: string;
+  age?: CustomVoiceAge;
+  language?: string;
+  use_case?:
+    | "conversational"
+    | "narration"
+    | "characters"
+    | "educational"
+    | "advertisement"
+    | "social_media"
+    | "entertainment";
+  tone?: "warm" | "casual" | "professional" | "friendly" | "authoritative" | "expressive" | "calm";
+};
+
+export type CustomVoice = {
+  voice_id: string;
+  name?: string | null;
+  description?: string | null;
+  gender?: CustomVoiceGender | null;
+  accent?: string | null;
+  age?: CustomVoiceAge | null;
+  language?: string | null;
+  use_case?: string | null;
+  tone?: string | null;
+  created_at: string;
+};
+
+export type CustomVoiceList = {
+  voices: CustomVoice[];
+  pagination_token?: string | null;
+};
+
+export type CustomVoiceCreateParams = CustomVoiceLabels & {
+  /** Reference audio of up to 120 seconds. */
+  file: Blob | File;
+};
+
+/** Omitted fields are unchanged; `null` clears a field. */
+export type CustomVoiceUpdateParams = {
+  [K in keyof CustomVoiceLabels]?: CustomVoiceLabels[K] | null;
+};
+
+export type ClientSecretCreateParams = {
+  expires_after?: {
+    /** At most 3600. Defaults to 600. */
+    seconds?: number;
+  };
+  session?: {
+    model?: RealtimeModelId;
+    reasoning?: { effort?: "high" | "none" };
+  } | null;
+};
+
+export type ClientSecret = {
+  value: string;
+  /** Unix time in seconds. */
+  expires_at: number;
 };
 
 export type RequestHook = (request: Request) => void | Promise<void>;

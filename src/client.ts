@@ -13,6 +13,7 @@ import { Batches } from "./resources/batches.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
 import { Videos } from "./resources/videos.js";
+import { VoiceResource } from "./resources/voice.js";
 import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
 
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
@@ -34,6 +35,7 @@ export class xAI {
   readonly videos: Videos;
   readonly files: Files;
   readonly batches: Batches;
+  readonly voice: VoiceResource;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -68,6 +70,7 @@ export class xAI {
     this.videos = new Videos(this);
     this.files = new Files(this);
     this.batches = new Batches(this);
+    this.voice = new VoiceResource(this);
   }
 
   [INSPECT](): object {

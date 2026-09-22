@@ -655,6 +655,68 @@ do {
 
 `wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to page through your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
 
+## Voice
+
+Convert text to speech with `client.voice.speak()`. The audio comes back as an `xAIBinaryResponse`, encoded as MP3 unless you set `output_format`:
+
+```ts
+import { writeFile } from "node:fs/promises";
+
+const speech = await client.voice.speak({
+  text: "Welcome to SpaceX. [pause] How can I help you today?",
+  language: "en",
+  voice_id: "eve",
+});
+
+await writeFile("welcome.mp3", await speech.bytes());
+```
+
+Shape the delivery with [speech tags](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech#speech-tags) in the text. Inline tags such as `[pause]`, `[long-pause]`, and `[laugh]` go where the sound should happen, and wrapping tags such as `<whisper>It's a secret.</whisper>` change how the enclosed text is spoken. The API doesn't report mistakes in tags, so TypeScript checks string literals as you type: it flags unknown tags such as `[laff]` and suggests the closest one, and it catches wrapping tags that are never closed, closed without being opened, or closed in the wrong order. To use a tag released after this SDK version, add `as string` to the text.
+
+`voice_id` autocompletes the built-in voices and accepts any other string, such as a custom voice ID or a voice added after this SDK version. List the built-in voices with `client.voice.voices.list()`. To start playback before synthesis finishes, read `speech.body` as a stream. Set `with_timestamps: true` to receive JSON with base64 `audio` and per-character `audio_timestamps` instead of audio bytes.
+
+Transcribe a recording with `client.voice.transcribe()`. Pass the audio as a `Blob` or `File`, or pass `url` to have the API download it:
+
+```ts
+import { openAsBlob } from "node:fs";
+
+const transcript = await client.voice.transcribe({
+  file: await openAsBlob("./meeting.mp3"),
+  language: "en",
+  format: true,
+});
+
+console.log(transcript.text);
+```
+
+`format: true` writes spoken numbers, currencies, and units in written form, and requires `language`. Word-level timings are in `transcript.words`.
+
+Clone a voice from a reference clip of up to 120 seconds with `client.voice.custom.create()`. Creating custom voices through the API requires an Enterprise plan:
+
+```ts
+import { openAsBlob } from "node:fs";
+
+const voice = await client.voice.custom.create({
+  file: await openAsBlob("./reference.wav"),
+  name: "Friendly Narrator",
+  language: "en",
+});
+
+console.log(voice.voice_id);
+```
+
+Pass the returned `voice_id` to `speak()` or a realtime session like a built-in voice. `client.voice.custom` also provides `list()`, `get()`, `update()`, `delete()`, and `getAudio()`, which downloads the reference clip.
+
+Realtime voice sessions in a browser should authenticate with a short-lived client secret instead of your API key. Create one on your server:
+
+```ts
+const secret = await client.voice.clientSecrets.create({
+  expires_after: { seconds: 300 },
+});
+```
+
+Send `secret.value` to the browser, which passes `xai-client-secret.<value>` as the WebSocket subprotocol when it connects to `wss://api.x.ai/v1/realtime`. Secrets expire after 10 minutes by default, and `expires_after.seconds` can be at most 3600.
+
 ## Models
 
 Use model IDs directly. `ModelId` suggests known string literals while still accepting models released after the installed SDK version:
@@ -810,7 +872,7 @@ Create a distributable tarball and SHA-256 checksum in `artifacts/`:
 pnpm pack:artifact
 ```
 
-Generated API types live in `src/generated/types.ts`, and the model ID union lives in `src/models.ts`. Run `pnpm generate:types` for API types and `pnpm generate:models` for model IDs instead of editing those files by hand.
+Generated API types live in `src/generated/types.ts`, speech tags, voice IDs, and voice model IDs in `src/generated/voice.ts`, and the model ID union in `src/models.ts`. Run `pnpm generate:types` for API types, `pnpm generate:voice` for the Voice API values, and `pnpm generate:models` for model IDs instead of editing those files by hand.
 
 ## Contributing and security
 
