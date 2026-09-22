@@ -25,6 +25,8 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - `VoiceId`, `TranscriptionModelId`, and `RealtimeModelId` types, each with a `Known…` variant for strict checks. `voice_id`, the `model` for `client.voice.transcribe()`, and a client secret's `session.model` autocomplete the documented values and accept any other string.
 - Speech to text with `client.voice.transcribe()` for `Blob` or `File` uploads and audio URLs.
 - Built-in voice lookup with `client.voice.voices`, custom voice management with `client.voice.custom`, and client secrets for browser realtime sessions with `client.voice.clientSecrets.create()`.
+- Embeddings with `client.embeddings.create()`, and embedding model lookup with `client.embeddings.models.list()` and `client.embeddings.models.get()`.
+- Text tokenization with `client.tokenizer.tokenize()`, which returns each token's ID, text, and bytes.
 
 ### Changed
 

@@ -10,10 +10,12 @@ import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
 import { Images } from "./resources/images.js";
 import { Files } from "./resources/files.js";
 import { Batches } from "./resources/batches.js";
+import { Embeddings } from "./resources/embeddings.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
 import { Videos } from "./resources/videos.js";
 import { VoiceResource } from "./resources/voice.js";
+import { Tokenizer } from "./resources/tokenizer.js";
 import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
 
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
@@ -36,6 +38,8 @@ export class xAI {
   readonly files: Files;
   readonly batches: Batches;
   readonly voice: VoiceResource;
+  readonly embeddings: Embeddings;
+  readonly tokenizer: Tokenizer;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -71,6 +75,8 @@ export class xAI {
     this.files = new Files(this);
     this.batches = new Batches(this);
     this.voice = new VoiceResource(this);
+    this.embeddings = new Embeddings(this);
+    this.tokenizer = new Tokenizer(this);
   }
 
   [INSPECT](): object {

@@ -417,6 +417,29 @@ export type ClientSecret = {
   expires_at: number;
 };
 
+export type EmbeddingCreateParams = Omit<
+  Schema["EmbeddingRequest"],
+  "encoding_format" | "input" | "model"
+> & {
+  model: string;
+  /** A string, token IDs, or a batch of up to 128 of either. */
+  input: string | string[] | number[] | number[][];
+  encoding_format?: "float" | "base64" | null;
+};
+
+export type Embedding = Schema["Embedding"];
+export type EmbeddingResponse = Schema["EmbeddingResponse"];
+export type EmbeddingModel = Schema["EmbeddingModel"];
+export type EmbeddingModelList = Schema["ListEmbeddingModelsResponse"];
+
+export type TokenizeParams = Omit<Schema["TokenizeRequest"], "model" | "text"> & {
+  model: ModelId;
+  text: string;
+};
+
+export type Token = Schema["TokenizeResponseToken"];
+export type TokenizeResponse = Schema["TokenizeResponse"];
+
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
 export type ResponseHook = (response: Response) => void | Promise<void>;

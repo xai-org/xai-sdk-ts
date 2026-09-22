@@ -717,6 +717,48 @@ const secret = await client.voice.clientSecrets.create({
 
 Send `secret.value` to the browser, which passes `xai-client-secret.<value>` as the WebSocket subprotocol when it connects to `wss://api.x.ai/v1/realtime`. Secrets expire after 10 minutes by default, and `expires_after.seconds` can be at most 3600.
 
+## Embeddings
+
+Create vector embeddings for text with one of the embedding models available to your API key:
+
+```ts
+const { models } = await client.embeddings.models.list();
+const [embeddingModel] = models;
+if (!embeddingModel) throw new Error("No embedding models are available to this API key");
+
+const result = await client.embeddings.create({
+  model: embeddingModel.id,
+  input: ["How do I rotate an API key?", "Create a new key, deploy it, then delete the old key."],
+});
+
+for (const item of result.data) {
+  console.log(item.index, item.embedding);
+}
+console.log(result.usage?.total_tokens);
+```
+
+Pass a string or an array of up to 128 strings as `input`, or token IDs in the same shapes. Set `encoding_format: "base64"` to receive each embedding as a base64 string instead of an array of floats.
+
+The embedding model catalog also includes modalities, aliases, and pricing. `client.embeddings.models.get(id)` returns one model.
+
+## Tokenization
+
+Tokenize text with a language model to count its tokens or see how it is split:
+
+```ts
+const { token_ids } = await client.tokenizer.tokenize({
+  model: "grok-4.6",
+  text: "Hello world!",
+});
+
+console.log(token_ids.length);
+for (const token of token_ids) {
+  console.log(token.token_id, token.string_token);
+}
+```
+
+Inference requests add tokens of their own, so `usage.input_tokens` for a prompt can be higher than this count.
+
 ## Models
 
 Use model IDs directly. `ModelId` suggests known string literals while still accepting models released after the installed SDK version:
