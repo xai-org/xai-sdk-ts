@@ -172,6 +172,86 @@ export type DeletedFile = Schema["DeleteFileResponse"];
 export type FilePublicUrl = Schema["CreatePublicUrlResponse"];
 export type FilePublicUrlRevocation = Schema["RevokePublicUrlResponse"];
 
+export type BatchCreateParams = {
+  name: string;
+  /** An uploaded JSONL file of requests. File-based batches don't accept more requests. */
+  input_file_id?: string;
+};
+
+export type Batch = {
+  batch_id: string;
+  name: string;
+  create_time: string;
+  expire_time?: string | null;
+  create_api_key_id: string;
+  cancel_time?: string | null;
+  cancel_by_xai_message?: string | null;
+  state: {
+    num_requests: number;
+    num_pending: number;
+    num_success: number;
+    num_error: number;
+    num_cancelled: number;
+  };
+};
+
+export type BatchList = {
+  batches: Batch[];
+  pagination_token?: string | null;
+};
+
+export type BatchWaitOptions = {
+  /** Milliseconds between polls. Defaults to 5000. */
+  interval?: number;
+  /** Maximum total wait in milliseconds. Defaults to 86400000 (24 hours). */
+  timeout?: number;
+  signal?: AbortSignal;
+};
+
+export type BatchRequest = {
+  /** Must be unique within the batch; generated when omitted. Results arrive in any order. */
+  batch_request_id?: string | null;
+  batch_request:
+    | { responses: CreateParams }
+    | { chat_get_completion: Schema["ChatRequest"] }
+    | { image_generation: Schema["GenerateImageRequest"] }
+    | { image_edit: Schema["EditImageRequest"] }
+    | { video_generation: Schema["GenerateVideoRequest"] | Schema["EditVideoRequest"] }
+    | { video_extension: Schema["ExtendVideoRequest"] };
+};
+
+export type BatchRequestMetadata = {
+  batch_request_id: string;
+  endpoint: string;
+  model: string;
+  state: "unknown" | "pending" | "succeeded" | "cancelled" | "failed";
+  create_time: string;
+  finish_time?: string | null;
+};
+
+export type BatchRequestMetadataList = {
+  batch_request_metadata: BatchRequestMetadata[];
+  pagination_token?: string | null;
+};
+
+export type BatchResult = {
+  batch_request_id: string;
+  batch_result:
+    | { error: string }
+    | {
+        response:
+          | "unknown"
+          | { chat_get_completion: Schema["ChatResponse"] }
+          | { image_generation: Schema["GeneratedImageResponse"] }
+          | { video_generation: Schema["VideoResponse"] };
+      };
+};
+
+export type BatchResultList = {
+  results: BatchResult[];
+  pagination_token?: string | null;
+};
+
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
 export type ResponseHook = (response: Response) => void | Promise<void>;

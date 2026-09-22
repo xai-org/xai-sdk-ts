@@ -16,6 +16,9 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - Video generation model lookup with `client.videos.models.list()` and `client.videos.models.get()`.
 - File uploads and management with `client.files.upload()`, `list()` (newest first by default), `get()`, and `delete()`, plus `content()`, which downloads a file's bytes as an `xAIBinaryResponse`.
 - Public file URLs with `client.files.createPublicUrl()` and `client.files.revokePublicUrl()`.
+- Batch API support with `client.batches.create()`, `list()`, `get()`, `cancel()`, and `results()`, plus `client.batches.requests.add()` and `client.batches.requests.list()`.
+- `client.batches.wait()` polls a batch until no requests are pending.
+- Batch `responses` requests take the same `CreateParams` as `client.responses.create()`, with the same `Blob` image inlining and `store: false` default.
 
 ### Changed
 

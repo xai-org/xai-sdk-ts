@@ -35,6 +35,15 @@ export type {
   VideoModelId,
 } from "./models.js";
 export type {
+  Batch,
+  BatchCreateParams,
+  BatchList,
+  BatchRequest,
+  BatchRequestMetadata,
+  BatchRequestMetadataList,
+  BatchResult,
+  BatchResultList,
+  BatchWaitOptions,
   ClientOptions,
   CreateParams,
   DeletedFile,

@@ -572,6 +572,60 @@ await client.files.delete(file.id);
 
 Anyone with a public URL can download the file without an API key. Only images, videos, and PDFs up to 50 MiB can be made public. A file has at most one public URL, so calling `createPublicUrl()` again returns the existing URL and updates its expiry if you pass a new `expires_after`. Without `expires_after`, the URL lasts as long as the file unless you revoke it. After revoking, copies already cached by the CDN can still be served briefly.
 
+## Batch API
+
+The Batch API processes large volumes of requests asynchronously at a reduced price. Most requests complete within 24 hours. Create a batch, then add requests to it:
+
+```ts
+const batch = await client.batches.create({ name: "feedback_sentiment" });
+
+const feedback = [
+  { id: "feedback_001", text: "The product exceeded my expectations!" },
+  { id: "feedback_002", text: "Shipping took way too long." },
+];
+
+await client.batches.requests.add(batch.batch_id, {
+  batch_requests: feedback.map((item) => ({
+    batch_request_id: item.id,
+    batch_request: {
+      responses: {
+        model: "grok-4.3",
+        input: [
+          { role: "system", content: "Classify the sentiment as positive, negative, or neutral." },
+          { role: "user", content: item.text },
+        ],
+      },
+    },
+  })),
+});
+```
+
+Each `batch_request` holds one request. `responses` takes the same `CreateParams` as `client.responses.create()`, including the `store: false` default, and its result comes back as a `chat_get_completion` response. `chat_get_completion`, `image_generation`, `image_edit`, `video_generation`, and `video_extension` take the request body of the matching REST endpoint. Results can come back in any order, so give each request a `batch_request_id` that is unique within the batch. Not every model accepts batch requests; each [model page](https://docs.x.ai/developers/models) lists its Batch API support.
+
+Wait until no requests are pending, then page through the results:
+
+```ts
+await client.batches.wait(batch.batch_id);
+
+let paginationToken: string | undefined;
+do {
+  const page = await client.batches.results(batch.batch_id, {
+    limit: 100,
+    pagination_token: paginationToken,
+  });
+  for (const { batch_request_id, batch_result } of page.results) {
+    if ("error" in batch_result) {
+      console.error(batch_request_id, batch_result.error);
+    } else {
+      console.log(batch_request_id, batch_result.response);
+    }
+  }
+  paginationToken = page.pagination_token ?? undefined;
+} while (paginationToken);
+```
+
+`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to page through your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
+
 ## Models
 
 Use model IDs directly. `ModelId` suggests known string literals while still accepting models released after the installed SDK version:

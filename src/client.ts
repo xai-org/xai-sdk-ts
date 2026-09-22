@@ -9,6 +9,7 @@ import { storeApiKey } from "./credentials.js";
 import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
 import { Images } from "./resources/images.js";
 import { Files } from "./resources/files.js";
+import { Batches } from "./resources/batches.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
 import { Videos } from "./resources/videos.js";
@@ -32,6 +33,7 @@ export class xAI {
   readonly images: Images;
   readonly videos: Videos;
   readonly files: Files;
+  readonly batches: Batches;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -65,6 +67,7 @@ export class xAI {
     this.images = new Images(this);
     this.videos = new Videos(this);
     this.files = new Files(this);
+    this.batches = new Batches(this);
   }
 
   [INSPECT](): object {
