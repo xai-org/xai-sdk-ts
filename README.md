@@ -814,6 +814,30 @@ for (const availableImageModel of imageModels.models) {
 
 const imageModelInfo = await client.images.models.get(imageModel);
 console.log(imageModelInfo);
+Chat and image understanding models have their own catalog, which includes modalities, aliases, token pricing, and supported reasoning efforts:
+
+```ts
+const languageModels = await client.models.language.list();
+for (const languageModel of languageModels.models) {
+  console.log(languageModel.id, languageModel.input_modalities);
+}
+
+const languageModelInfo = await client.models.language.get("grok-4.6");
+console.log(languageModelInfo.capabilities?.reasoning_effort);
+```
+
+Token prices such as `prompt_text_token_price` are in USD cents per 100 million tokens. Divide them by 10,000 for US dollars per million tokens.
+
+## Account
+
+`client.account.apiKey()` returns the name, status, and permissions of the API key the client is using. `client.account.me()` returns the caller's user ID, team ID, and Zero Data Retention status:
+
+```ts
+const apiKeyInfo = await client.account.apiKey();
+console.log(apiKeyInfo.name, apiKeyInfo.acls, apiKeyInfo.api_key_disabled);
+
+const callerInfo = await client.account.me();
+console.log(callerInfo.team_id, callerInfo.zdr_status);
 ```
 
 ## Response storage

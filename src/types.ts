@@ -26,6 +26,10 @@ export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
 export type InputItemList = Schema["ListInputItemsResponse"];
 export type Model = Schema["Model"];
 export type ModelList = Schema["ListModelsResponse"];
+export type LanguageModel = Schema["LanguageModel"];
+export type LanguageModelList = Schema["ListLanguageModelsResponse"];
+export type ApiKeyInfo = Schema["ApiKey"];
+export type CallerInfo = Schema["GetMeResponse"];
 export type Tool =
   | Exclude<GeneratedTool, GeneratedFunctionTool>
   | (Omit<GeneratedFunctionTool, "parameters"> & {

@@ -28,6 +28,8 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - Embeddings with `client.embeddings.create()`, and embedding model lookup with `client.embeddings.models.list()` and `client.embeddings.models.get()`.
 - Text tokenization with `client.tokenizer.tokenize()`, which returns each token's ID, text, and bytes.
 - Collection document search with `client.documents.search()`.
+- Language model lookup with `client.models.language.list()` and `client.models.language.get()`, including modalities, aliases, and token pricing.
+- API key and caller lookup with `client.account.apiKey()` and `client.account.me()`.
 
 ### Changed
 
