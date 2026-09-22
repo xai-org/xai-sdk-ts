@@ -14,6 +14,8 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - Video generation, image-to-video, editing, and extension with `client.videos.generate()`, `client.videos.edit()`, and `client.videos.extend()`, including `Blob` or `File` image inputs.
 - `client.videos.get()` to check a video request and `client.videos.wait()` to poll it until it is no longer pending, with `interval`, `timeout`, and `signal` options.
 - Video generation model lookup with `client.videos.models.list()` and `client.videos.models.get()`.
+- File uploads and management with `client.files.upload()`, `list()` (newest first by default), `get()`, and `delete()`, plus `content()`, which downloads a file's bytes as an `xAIBinaryResponse`.
+- Public file URLs with `client.files.createPublicUrl()` and `client.files.revokePublicUrl()`.
 
 ### Changed
 

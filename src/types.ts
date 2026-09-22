@@ -1,4 +1,4 @@
-import type { components } from "./generated/types.js";
+import type { components, operations } from "./generated/types.js";
 import type { ImageModelId, ModelId, VideoModelId } from "./models.js";
 import type { MediaUsage } from "./usage.js";
 
@@ -146,6 +146,31 @@ export type VideoWaitOptions = {
 
 export type VideoGenerationModel = Schema["VideoGenerationModel"];
 export type VideoGenerationModelList = Schema["ListVideoGenerationModelsResponse"];
+
+/**
+ * The API records the multipart filename as the file's `filename`. It defaults to the
+ * `File` name; FormData would send a plain `Blob` as `blob`.
+ */
+export type FileUploadParams = Omit<Schema["UploadFileMultipartRequest"], "file"> &
+  ({ file: File; filename?: string } | { file: Blob; filename: string });
+export type FileListParams = Omit<
+  NonNullable<operations["handle_list_files_request"]["parameters"]["query"]>,
+  "order" | "sort_by"
+> & {
+  /** Defaults to `desc`. */
+  order?: "asc" | "desc";
+  /** SDK default is `created_at`. Without it, the API returns files in no guaranteed order. */
+  sort_by?: "created_at" | "filename" | "size";
+};
+export type FileContentParams = NonNullable<
+  operations["handle_download_file_content_request"]["parameters"]["query"]
+>;
+export type FilePublicUrlParams = Schema["CreatePublicUrlRequest"];
+export type FileObject = Schema["File"];
+export type FileObjectList = Schema["ListFilesResponse"];
+export type DeletedFile = Schema["DeleteFileResponse"];
+export type FilePublicUrl = Schema["CreatePublicUrlResponse"];
+export type FilePublicUrlRevocation = Schema["RevokePublicUrlResponse"];
 
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */

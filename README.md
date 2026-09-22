@@ -21,9 +21,9 @@
   </p>
 </div>
 
-Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image generation and editing, multi-turn conversations, and access to usage and HTTP metadata.
+Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image generation and editing, file uploads, multi-turn conversations, and access to usage and HTTP metadata.
 
-> **Experimental.** This SDK is in early development. It currently covers the Responses API, image generation and editing, and model listing, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
+> **Experimental.** This SDK is in early development. It currently covers the Responses API, image generation and editing, the Files API, and model listing, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
 
 ## Requirements
 
@@ -515,6 +515,62 @@ const extension = await client.videos.extend({
 ```
 
 List the video generation models available to your API key with `client.videos.models.list()`, or look one up by ID with `client.videos.models.get()`.
+
+## Files
+
+Upload a document, image, or video once and refer to it by ID. A file ID works wherever the API accepts a `file_id`, such as an `input_file` part in the Responses API or an image or video input:
+
+```ts
+import { openAsBlob } from "node:fs";
+
+const file = await client.files.upload({
+  file: await openAsBlob("./report.pdf"),
+  filename: "report.pdf",
+});
+
+const response = await client.responses.create({
+  model: "grok-4.6",
+  input: [
+    {
+      role: "user",
+      content: [
+        { type: "input_text", text: "Summarize the key findings in this report." },
+        { type: "input_file", file_id: file.id },
+      ],
+    },
+  ],
+});
+
+console.log(response.toText());
+```
+
+The API records the upload's filename as the file's `filename`. A `File` uses its own name, and a plain `Blob`, such as one from `openAsBlob()`, needs `filename`. Files are kept until you delete them; set `expires_after` to between 3,600 and 2,592,000 seconds (1 hour to 30 days) to have one deleted automatically.
+
+List, download, share, and delete stored files:
+
+```ts
+import { writeFile } from "node:fs/promises";
+
+const page = await client.files.list({ limit: 100 });
+for (const stored of page.data) {
+  console.log(stored.id, stored.filename, stored.bytes);
+}
+
+const content = await client.files.content(file.id);
+await writeFile("report-copy.pdf", await content.bytes());
+
+const { public_url } = await client.files.createPublicUrl(file.id, {
+  expires_after: 86_400,
+});
+console.log(public_url);
+
+await client.files.revokePublicUrl(file.id);
+await client.files.delete(file.id);
+```
+
+`list()` returns the newest files first. To fetch the next page, pass the returned `pagination_token` to `list()`. A page with fewer than `limit` files is the last one. `content()` returns an `xAIBinaryResponse`: stream its `body` or read it with `bytes()`, `text()`, or `blob()`.
+
+Anyone with a public URL can download the file without an API key. Only images, videos, and PDFs up to 50 MiB can be made public. A file has at most one public URL, so calling `createPublicUrl()` again returns the existing URL and updates its expiry if you pass a new `expires_after`. Without `expires_after`, the URL lasts as long as the file unless you revoke it. After revoking, copies already cached by the CDN can still be served briefly.
 
 ## Models
 
