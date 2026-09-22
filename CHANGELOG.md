@@ -8,6 +8,9 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 
 - Open-source contribution, security, ownership, CI, and release safeguards.
 - Image and video generation model ID types: `ImageModelId`, `KnownImageModelId`, `VideoModelId`, and `KnownVideoModelId`.
+- Image generation and editing with `client.images.generate()` and `client.images.edit()`, including multi-image edits and `Blob` or `File` source images.
+- Image generation model lookup with `client.images.models.list()` and `client.images.models.get()`.
+- `isImageGenerationCall` and typed `response.image_generation_call.*` stream events for the Responses API image generation tool.
 
 ### Changed
 

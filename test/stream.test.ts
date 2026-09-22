@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APIError, TimeoutError, xAI } from "../src/index.js";
+import { APIError, TimeoutError, isImageGenerationCall, xAI } from "../src/index.js";
 import { completedResponse, createBody, mockFetch, sseResponse, usageFixture } from "./helpers.js";
 
 describe("responses.create stream", () => {
@@ -98,6 +98,50 @@ describe("responses.create stream", () => {
     expect(deltas).toEqual(['{"loc"', ':"SF"}']);
     const item = stream.output[0] as { arguments: string };
     expect(JSON.parse(item.arguments)).toEqual({ loc: "SF" });
+  });
+
+  it("types image generation progress events and keeps the finished call", async () => {
+    const call = {
+      type: "image_generation_call",
+      id: "ig_1",
+      status: "completed",
+      prompt: "A corgi surfing a big wave",
+      result: "aW1hZ2U=",
+    };
+    const progress = [
+      "response.image_generation_call.in_progress",
+      "response.image_generation_call.generating",
+      "response.image_generation_call.completed",
+    ];
+    const { fetch } = mockFetch(() =>
+      sseResponse([
+        {
+          type: "response.output_item.added",
+          output_index: 0,
+          item: { type: "image_generation_call", id: "ig_1", status: "in_progress" },
+        },
+        ...progress.map((type) => ({ type, item_id: "ig_1", output_index: 0 })),
+        { type: "response.output_item.done", output_index: 0, item: call },
+        { type: "response.completed", response: { ...completedResponse, output: [call] } },
+      ]),
+    );
+    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const stream = await client.responses.create({
+      ...createBody,
+      tools: [{ type: "image_generation" }],
+      stream: true,
+    });
+    const seen: string[] = [];
+    let doneItems: unknown[] = [];
+    for await (const event of stream) {
+      if (event.type.startsWith("response.image_generation_call.")) seen.push(event.type);
+      if (event.type === "response.output_item.done") {
+        doneItems = stream.output.filter(isImageGenerationCall);
+      }
+    }
+    expect(seen).toEqual(progress);
+    expect(doneItems).toEqual([call]);
+    expect(stream.output.filter(isImageGenerationCall)).toEqual([call]);
   });
 
   it("surfaces unknown wire events as type unknown", async () => {

@@ -1,5 +1,6 @@
 import type { components } from "./generated/types.js";
-import type { ModelId } from "./models.js";
+import type { ImageModelId, ModelId } from "./models.js";
+import type { MediaUsage } from "./usage.js";
 
 type Schema = components["schemas"];
 type GeneratedTool = Schema["ModelTool"];
@@ -17,6 +18,7 @@ export type FunctionToolCall = Omit<Schema["FunctionToolCall"], "type"> & {
 export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
   type: "reasoning";
 };
+export type ImageGenerationCall = Schema["ImageGenerationCall"];
 export type IncompleteDetails = Schema["IncompleteDetails"];
 export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
 export type InputItemList = Schema["ListInputItemsResponse"];
@@ -69,6 +71,42 @@ export type CreateParams = Omit<
 
 /** Blob and File values are client-only: inlined to a `url` data URL before send. */
 export type ImageInput = Schema["ImageUrl"] | Blob | File;
+
+type ImageRequestFields = {
+  model: ImageModelId;
+  prompt: string;
+  response_format?: "url" | "b64_json" | null;
+  /** Defaults to `auto`. Only supported by `grok-imagine-image-2.0`. */
+  quality?: "low" | "medium" | "auto" | null;
+};
+
+export type ImageGenerateParams = Omit<
+  Schema["GenerateImageRequest"],
+  keyof ImageRequestFields
+> &
+  ImageRequestFields;
+
+export type ImageEditParams = Omit<
+  Schema["EditImageRequest"],
+  keyof ImageRequestFields | "image" | "images"
+> &
+  ImageRequestFields &
+  (
+    | { image: ImageInput; images?: never }
+    | {
+        /** Refer to them as `<IMAGE_0>`, `<IMAGE_1>`, and so on in the prompt. */
+        images: ImageInput[];
+        image?: never;
+      }
+  );
+
+export type GeneratedImage = Schema["GeneratedImage"];
+export type ImageResponse = Omit<Schema["GeneratedImageResponse"], "usage"> & {
+  usage: MediaUsage | null;
+  http: HttpMeta;
+};
+export type ImageGenerationModel = Schema["ImageGenerationModel"];
+export type ImageGenerationModelList = Schema["ListImageGenerationModelsResponse"];
 
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
@@ -211,6 +249,24 @@ type StreamEvent =
       output_index?: number;
       name?: string;
       arguments: string;
+      sequence_number?: number;
+    }
+  | {
+      type: "response.image_generation_call.in_progress";
+      item_id?: string;
+      output_index?: number;
+      sequence_number?: number;
+    }
+  | {
+      type: "response.image_generation_call.generating";
+      item_id?: string;
+      output_index?: number;
+      sequence_number?: number;
+    }
+  | {
+      type: "response.image_generation_call.completed";
+      item_id?: string;
+      output_index?: number;
       sequence_number?: number;
     };
 

@@ -21,9 +21,9 @@
   </p>
 </div>
 
-Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, multi-turn conversations, and access to usage and HTTP metadata.
+Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image generation and editing, multi-turn conversations, and access to usage and HTTP metadata.
 
-> **Experimental.** This SDK is in early development. It currently covers the Responses API and model listing, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
+> **Experimental.** This SDK is in early development. It currently covers the Responses API, image generation and editing, and model listing, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
 
 ## Requirements
 
@@ -310,6 +310,37 @@ console.log(response.usage.num_server_side_tools_used);
 
 See the [xAI documentation](https://docs.x.ai) for the available server-side tools and their options.
 
+## Image generation tool
+
+Add the image generation tool to let the model create or edit images as one step of a response. Each image arrives as an `image_generation_call` output item whose `result` holds base64 image data:
+
+```ts
+import { writeFile } from "node:fs/promises";
+import { type Tool, isImageGenerationCall, xAI } from "@xai-official/sdk";
+
+const client = new xAI();
+const imageGenerationTool = {
+  type: "image_generation",
+} satisfies Tool;
+
+const response = await client.responses.create({
+  model: "grok-4.7",
+  input: "Generate an image of a corgi surfing a big wave, in the style of a Japanese woodblock print.",
+  tools: [imageGenerationTool],
+});
+
+console.log(response.toText());
+
+const call = response.output.find(isImageGenerationCall);
+if (call?.result) {
+  await writeFile("corgi.jpg", Buffer.from(call.result, "base64"));
+}
+```
+
+Set `action: "generate"` or `action: "edit"` on the tool to allow only one of those capabilities. When streaming, each call emits `response.image_generation_call.in_progress`, `response.image_generation_call.generating`, and `response.image_generation_call.completed` events, then a `response.output_item.done` event carries the finished item.
+
+To generate or edit an image directly with full control over its size and format, use the [image generation](#image-generation) and [image editing](#image-editing) methods instead.
+
 ## Working with responses
 
 Every completed response provides:
@@ -342,6 +373,92 @@ for (const item of response.output) {
 }
 ```
 
+## Image generation
+
+Generate images from a text prompt with a Grok Imagine model. Images are returned as temporary URLs by default, so download or process them promptly:
+
+```ts
+const result = await client.images.generate({
+  model: "grok-imagine-image-2.0",
+  prompt: "A collage of London landmarks in a stenciled street-art style",
+});
+
+console.log(result.data[0]?.url);
+console.log(result.usage?.cost_usd);
+```
+
+Request up to 10 images with `n`, and shape the output with `aspect_ratio`, `resolution`, and `quality`. Only `grok-imagine-image-2.0` supports `quality`. Set `response_format: "b64_json"` to receive base64 data instead of URLs:
+
+```ts
+import { writeFile } from "node:fs/promises";
+
+const result = await client.images.generate({
+  model: "grok-imagine-image-2.0",
+  prompt: "A futuristic city skyline at night",
+  n: 4,
+  aspect_ratio: "16:9",
+  resolution: "2k",
+  response_format: "b64_json",
+});
+
+for (const [index, image] of result.data.entries()) {
+  if (image.b64_json) {
+    await writeFile(`skyline-${index}.jpg`, Buffer.from(image.b64_json, "base64"));
+  }
+}
+```
+
+Base64 output is about a third larger than the image file, so large batches of high-resolution images can approach the default 32 MiB response size limit. Raise `maxResponseBodyBytes` for those requests:
+
+```ts
+const result = await client.images.generate(
+  {
+    model: "grok-imagine-image-2.0",
+    prompt: "A futuristic city skyline at night",
+    n: 10,
+    resolution: "2k",
+    response_format: "b64_json",
+  },
+  { maxResponseBodyBytes: 128 * 1024 * 1024 },
+);
+```
+
+Each result provides `data`, `usage`, and `http`. `usage.cost_usd` converts the reported `cost_in_usd_ticks` to US dollars, and `usage` is `null` when the API omits it.
+
+## Image editing
+
+Pass a source image with your prompt to edit it. `image` accepts a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
+
+```ts
+import { openAsBlob } from "node:fs";
+
+const photo = await openAsBlob("./photo.png");
+
+const result = await client.images.edit({
+  model: "grok-imagine-image-2.0",
+  prompt: "Render this as a pencil sketch with detailed shading",
+  image: photo,
+});
+
+console.log(result.data[0]?.url);
+```
+
+When a `Blob` or `File` has no MIME type, as with `openAsBlob()` or `new File([bytes], "photo.png")`, the SDK detects JPEG, PNG, or WebP from its first bytes. The API rejects image data URLs that are not typed as one of those formats.
+
+To combine up to five source images, pass `images` instead of `image` and refer to them in the prompt as `<IMAGE_0>`, `<IMAGE_1>`, and so on. The output follows the first image's aspect ratio unless you set `aspect_ratio`:
+
+```ts
+const result = await client.images.edit({
+  model: "grok-imagine-image-2.0",
+  prompt: "Place the cat from <IMAGE_0> on the sofa from <IMAGE_1>",
+  images: [
+    { url: "https://example.com/cat.png" },
+    { file_id: "file_abc123" },
+  ],
+  aspect_ratio: "16:9",
+});
+```
+
 ## Models
 
 Use model IDs directly. `ModelId` suggests known string literals while still accepting models released after the installed SDK version:
@@ -361,6 +478,22 @@ console.log(modelInfo);
 ```
 
 `KnownModelId` is generated from the [xAI model documentation](https://docs.x.ai/developers/models). Use it when you want strict validation against the models known to this SDK release.
+
+Image generation models have their own catalog, which includes modalities, aliases, and pricing. `ImageModelId` and `KnownImageModelId` work the same way as the text model types:
+
+```ts
+import { type KnownImageModelId } from "@xai-official/sdk";
+
+const imageModel = "grok-imagine-image-2.0" satisfies KnownImageModelId;
+
+const imageModels = await client.images.models.list();
+for (const availableImageModel of imageModels.models) {
+  console.log(availableImageModel.id, availableImageModel.aliases);
+}
+
+const imageModelInfo = await client.images.models.get(imageModel);
+console.log(imageModelInfo);
+```
 
 ## Response storage
 
@@ -413,7 +546,7 @@ controller.abort();
 await pending;
 ```
 
-Create requests retry explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and use jittered exponential backoff.
+Requests that generate content, such as `responses.create`, `images.generate`, and `images.edit`, retry only explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and use jittered exponential backoff.
 
 ## Errors
 

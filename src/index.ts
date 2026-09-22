@@ -17,7 +17,14 @@ export {
   RateLimitError,
   TimeoutError,
 } from "./errors.js";
-export { isFunctionCall, isMessage, isReasoning, toInput, toText } from "./porcelain.js";
+export {
+  isFunctionCall,
+  isImageGenerationCall,
+  isMessage,
+  isReasoning,
+  toInput,
+  toText,
+} from "./porcelain.js";
 export type { MediaUsage, Usage } from "./usage.js";
 export type {
   ImageModelId,
@@ -32,8 +39,15 @@ export type {
   CreateParams,
   DeletedResponse,
   FunctionToolCall,
+  GeneratedImage,
   HttpMeta,
+  ImageEditParams,
+  ImageGenerateParams,
+  ImageGenerationCall,
+  ImageGenerationModel,
+  ImageGenerationModelList,
   ImageInput,
+  ImageResponse,
   IncompleteDetails,
   InputItem,
   InputItemList,

@@ -3,6 +3,8 @@ import { errorFromAbort } from "./errors.js";
 import type {
   CreateParams,
   FunctionToolCall,
+  ImageEditParams,
+  ImageGenerationCall,
   ImageInput,
   InputItem,
   OutputItem,
@@ -24,6 +26,10 @@ export function isReasoning(item: unknown): item is ReasoningItem {
 
 export function isFunctionCall(item: unknown): item is FunctionToolCall {
   return isRecord(item) && item.type === "function_call";
+}
+
+export function isImageGenerationCall(item: unknown): item is ImageGenerationCall {
+  return isRecord(item) && item.type === "image_generation_call";
 }
 
 export function toText(output: readonly OutputItem[]): string {
@@ -168,6 +174,29 @@ export async function inlineImageInput(
   signal?: AbortSignal,
 ): Promise<Exclude<ImageInput, Blob>> {
   return isBlobLike(image) ? { url: await blobToDataUrl(image, signal) } : image;
+}
+
+export type ImageEditWireBody = Omit<ImageEditParams, "image" | "images"> & {
+  image?: Exclude<ImageInput, Blob>;
+  images?: Exclude<ImageInput, Blob>[];
+};
+
+/**
+ * Convert porcelain `Blob | File` edit inputs to wire `{ url }` data URLs.
+ */
+export async function inlineImageInputs(
+  body: ImageEditParams,
+  signal?: AbortSignal,
+): Promise<ImageEditWireBody> {
+  assertNotAborted(signal);
+  const { image, images, ...rest } = body;
+  const out: ImageEditWireBody = rest;
+  if (image != null) out.image = await inlineImageInput(image, signal);
+  if (images != null) {
+    out.images = [];
+    for (const item of images) out.images.push(await inlineImageInput(item, signal));
+  }
+  return out;
 }
 
 /**

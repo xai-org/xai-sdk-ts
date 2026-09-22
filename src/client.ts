@@ -7,6 +7,7 @@ import {
 } from "./constants.js";
 import { storeApiKey } from "./credentials.js";
 import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
+import { Images } from "./resources/images.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
 import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
@@ -26,6 +27,7 @@ export class xAI {
   readonly onResponse?: ResponseHook;
   readonly responses: Responses;
   readonly models: ModelsResource;
+  readonly images: Images;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -56,6 +58,7 @@ export class xAI {
     this.onResponse = opts.onResponse;
     this.responses = new Responses(this);
     this.models = new ModelsResource(this);
+    this.images = new Images(this);
   }
 
   [INSPECT](): object {
