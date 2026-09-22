@@ -27,6 +27,7 @@ All notable changes to the xAI TypeScript SDK will be documented in this file.
 - Built-in voice lookup with `client.voice.voices`, custom voice management with `client.voice.custom`, and client secrets for browser realtime sessions with `client.voice.clientSecrets.create()`.
 - Embeddings with `client.embeddings.create()`, and embedding model lookup with `client.embeddings.models.list()` and `client.embeddings.models.get()`.
 - Text tokenization with `client.tokenizer.tokenize()`, which returns each token's ID, text, and bytes.
+- Collection document search with `client.documents.search()`.
 
 ### Changed
 

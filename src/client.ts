@@ -11,6 +11,7 @@ import { Images } from "./resources/images.js";
 import { Files } from "./resources/files.js";
 import { Batches } from "./resources/batches.js";
 import { Embeddings } from "./resources/embeddings.js";
+import { Documents } from "./resources/documents.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
 import { Videos } from "./resources/videos.js";
@@ -40,6 +41,7 @@ export class xAI {
   readonly voice: VoiceResource;
   readonly embeddings: Embeddings;
   readonly tokenizer: Tokenizer;
+  readonly documents: Documents;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -77,6 +79,7 @@ export class xAI {
     this.voice = new VoiceResource(this);
     this.embeddings = new Embeddings(this);
     this.tokenizer = new Tokenizer(this);
+    this.documents = new Documents(this);
   }
 
   [INSPECT](): object {

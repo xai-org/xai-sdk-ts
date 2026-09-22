@@ -440,6 +440,10 @@ export type TokenizeParams = Omit<Schema["TokenizeRequest"], "model" | "text"> &
 export type Token = Schema["TokenizeResponseToken"];
 export type TokenizeResponse = Schema["TokenizeResponse"];
 
+export type DocumentSearchParams = Schema["SearchRequest"];
+export type DocumentSearchMatch = Schema["SearchMatch"];
+export type DocumentSearchResponse = Schema["SearchResponse"];
+
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
 export type ResponseHook = (response: Response) => void | Promise<void>;

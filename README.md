@@ -759,6 +759,27 @@ for (const token of token_ids) {
 
 Inference requests add tokens of their own, so `usage.input_tokens` for a prompt can be higher than this count.
 
+## Document search
+
+Search for the document chunks most relevant to a query within one or more [collections](https://docs.x.ai/developers/files/collections):
+
+```ts
+const results = await client.documents.search({
+  query: "What was the revenue in the last quarter?",
+  source: { collection_ids: ["collection_abc123"] },
+  filter: 'document_type = "financial_report" AND year > 2020',
+  limit: 5,
+});
+
+for (const match of results.matches) {
+  console.log(match.score, match.file_id, match.chunk_content);
+}
+```
+
+`filter` matches the [metadata fields](https://docs.x.ai/developers/files/collections/metadata) defined on a collection, and `retrieval_mode` selects semantic, keyword, or hybrid search.
+
+Search requests use your regular API key. To create collections and upload documents, use the [xAI Console](https://console.x.ai) or the Management API, which this SDK does not cover.
+
 ## Models
 
 Use model IDs directly. `ModelId` suggests known string literals while still accepting models released after the installed SDK version:
