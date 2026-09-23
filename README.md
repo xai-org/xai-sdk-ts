@@ -21,9 +21,9 @@
   </p>
 </div>
 
-Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image generation and editing, file uploads, multi-turn conversations, and access to usage and HTTP metadata.
+Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image and video generation, file uploads, batch processing, text to speech and transcription, embeddings, document search, multi-turn conversations, and access to usage and HTTP metadata.
 
-> **Experimental.** This SDK is in early development. It currently covers the Responses API, image generation and editing, the Files API, and model listing, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
+> **Experimental.** This SDK is in early development. It currently covers the Responses API, image and video generation, the Files, Batch, and Voice APIs, embeddings and tokenization, document search, and model and account lookup, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
 
 ## Requirements
 
@@ -814,6 +814,8 @@ for (const availableImageModel of imageModels.models) {
 
 const imageModelInfo = await client.images.models.get(imageModel);
 console.log(imageModelInfo);
+```
+
 Chat and image understanding models have their own catalog, which includes modalities, aliases, token pricing, and supported reasoning efforts:
 
 ```ts
