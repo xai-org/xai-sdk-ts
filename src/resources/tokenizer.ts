@@ -7,7 +7,7 @@ import type { xAI } from "../client.js";
 export class Tokenizer {
   constructor(private readonly client: xAI) {}
 
-  async tokenize(
+  async encode(
     params: TokenizeParams,
     opts?: RequestOpts,
   ): Promise<TokenizeResponse & { http: HttpMeta }> {

@@ -14,7 +14,7 @@ function client(fetch: typeof globalThis.fetch): xAI {
   return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
-describe("tokenizer.tokenize", () => {
+describe("tokenizer.encode", () => {
   it("posts the params to /tokenize-text and maps token_ids and http", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(tokenizeResponse));
     const params = {
@@ -22,7 +22,7 @@ describe("tokenizer.tokenize", () => {
       text: "Hello world!",
       user: "user_123",
     } satisfies TokenizeParams;
-    const res = await client(fetch).tokenizer.tokenize(params);
+    const res = await client(fetch).tokenizer.encode(params);
 
     const request = captured.requests[0];
     expect(captured.requests).toHaveLength(1);
@@ -43,7 +43,7 @@ describe("tokenizer.tokenize", () => {
   ])("rejects %s", async (_label, payload) => {
     const { fetch } = mockFetch(() => jsonResponse(payload));
     await expect(
-      client(fetch).tokenizer.tokenize({ model: "grok-4.6", text: "Hello world!" }),
+      client(fetch).tokenizer.encode({ model: "grok-4.6", text: "Hello world!" }),
     ).rejects.toBeInstanceOf(APIProtocolError);
   });
 });

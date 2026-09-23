@@ -743,10 +743,10 @@ The embedding model catalog also includes modalities, aliases, and pricing. `cli
 
 ## Tokenization
 
-Tokenize text with a language model to count its tokens or see how it is split:
+Encode text with a language model's tokenizer to count its tokens or see how it is split:
 
 ```ts
-const { token_ids } = await client.tokenizer.tokenize({
+const { token_ids } = await client.tokenizer.encode({
   model: "grok-4.6",
   text: "Hello world!",
 });
@@ -758,6 +758,14 @@ for (const token of token_ids) {
 ```
 
 Inference requests add tokens of their own, so `usage.input_tokens` for a prompt can be higher than this count.
+
+The API has no decode endpoint, but each token carries its bytes, so you can turn encoded tokens back into text. Decode `token_bytes` rather than joining `string_token`, because a token can hold part of a multi-byte character:
+
+```ts
+const text = new TextDecoder().decode(
+  new Uint8Array(token_ids.flatMap((token) => token.token_bytes)),
+);
+```
 
 ## Document search
 
