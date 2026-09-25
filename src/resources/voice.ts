@@ -1,6 +1,7 @@
 import { send, type SendResult } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { xAIBinaryResponse } from "../binary.js";
+import { tokenPages, type PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type {
   ClientSecret,
@@ -156,24 +157,30 @@ export class CustomVoices {
     return toCustomVoice(result);
   }
 
-  async list(
+  list(
     query: { limit?: number; pagination_token?: string } = {},
     opts?: RequestOpts,
-  ): Promise<CustomVoiceList & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: "/custom-voices",
+  ): PagePromise<CustomVoiceList & { http: HttpMeta }, CustomVoice> {
+    return tokenPages(
       query,
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Custom voice list");
-    if (!Array.isArray(body.voices)) {
-      throw new APIProtocolError("Custom voice list is missing voices", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as CustomVoiceList), http: result.http };
+      async (pageQuery) => {
+        const result = await send(this.client, {
+          method: "GET",
+          path: "/custom-voices",
+          query: pageQuery,
+          opts,
+        });
+        const body = requireRecord(result.payload, result.http, "Custom voice list");
+        if (!Array.isArray(body.voices)) {
+          throw new APIProtocolError("Custom voice list is missing voices", {
+            ...requestIds(result.http),
+            body,
+          });
+        }
+        return { ...(body as CustomVoiceList), http: result.http };
+      },
+      (page) => page.voices,
+    );
   }
 
   async get(voiceId: string, opts?: RequestOpts): Promise<CustomVoice & { http: HttpMeta }> {

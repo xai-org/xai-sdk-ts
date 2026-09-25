@@ -25,6 +25,7 @@ export {
   toInput,
   toText,
 } from "./porcelain.js";
+export type { PagePromise } from "./pagination.js";
 export type { MediaUsage, Usage } from "./usage.js";
 export type {
   ImageModelId,

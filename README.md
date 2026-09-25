@@ -580,8 +580,7 @@ List, download, share, and delete stored files:
 ```ts
 import { writeFile } from "node:fs/promises";
 
-const page = await client.files.list({ limit: 100 });
-for (const stored of page.data) {
+for await (const stored of client.files.list()) {
   console.log(stored.id, stored.filename, stored.bytes);
 }
 
@@ -597,7 +596,7 @@ await client.files.revokePublicUrl(file.id);
 await client.files.delete(file.id);
 ```
 
-`list()` returns the newest files first. To fetch the next page, pass the returned `pagination_token` to `list()`. A page with fewer than `limit` files is the last one. `content()` returns an `xAIBinaryResponse`: stream its `body` or read it with `bytes()`, `text()`, or `blob()`.
+`list()` returns the newest files first and fetches further pages as the loop needs them. `content()` returns an `xAIBinaryResponse`: stream its `body` or read it with `bytes()`, `text()`, or `blob()`.
 
 Anyone with a public URL can download the file without an API key. Only images, videos, and PDFs up to 50 MiB can be made public. A file has at most one public URL, so calling `createPublicUrl()` again returns the existing URL and updates its expiry if you pass a new `expires_after`. Without `expires_after`, the URL lasts as long as the file unless you revoke it. After revoking, copies already cached by the CDN can still be served briefly.
 
@@ -631,29 +630,21 @@ await client.batches.requests.add(batch.batch_id, {
 
 Each `batch_request` holds one request. `responses` takes the same `CreateParams` as `client.responses.create()`, including the `store: false` default, and its result comes back as a `chat_get_completion` response. `image_generation`, `image_edit`, `video_generation`, and `video_extension` take the request body of the matching REST endpoint. Results can come back in any order, so give each request a `batch_request_id` that is unique within the batch. Not every model accepts batch requests; each [model page](https://docs.x.ai/developers/models) lists its Batch API support.
 
-Wait until no requests are pending, then page through the results:
+Wait until no requests are pending, then read the results:
 
 ```ts
 await client.batches.wait(batch.batch_id);
 
-let paginationToken: string | undefined;
-do {
-  const page = await client.batches.results(batch.batch_id, {
-    limit: 100,
-    pagination_token: paginationToken,
-  });
-  for (const { batch_request_id, batch_result } of page.results) {
-    if ("error" in batch_result) {
-      console.error(batch_request_id, batch_result.error);
-    } else {
-      console.log(batch_request_id, batch_result.response);
-    }
+for await (const { batch_request_id, batch_result } of client.batches.results(batch.batch_id)) {
+  if ("error" in batch_result) {
+    console.error(batch_request_id, batch_result.error);
+  } else {
+    console.log(batch_request_id, batch_result.response);
   }
-  paginationToken = page.pagination_token ?? undefined;
-} while (paginationToken);
+}
 ```
 
-`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to page through your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
+`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
 
 ## Voice
 
@@ -819,6 +810,18 @@ const fetched = await client.responses.get(stored.id);
 const inputItems = await client.responses.inputItems.list(stored.id);
 await client.responses.delete(stored.id);
 ```
+
+## Pagination
+
+List methods that return results in pages fetch the next page for you in a `for await` loop:
+
+```ts
+for await (const file of client.files.list()) {
+  console.log(file.id);
+}
+```
+
+This works for `files.list()`, `batches.list()`, `batches.results()`, `batches.requests.list()`, `voice.custom.list()`, and `responses.inputItems.list()`. Awaiting one of these calls instead returns a single page.
 
 ## Timeouts, retries, and cancellation
 

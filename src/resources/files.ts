@@ -1,6 +1,7 @@
 import { send, type SendResult } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { xAIBinaryResponse } from "../binary.js";
+import { tokenPages, type PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type {
   DeletedFile,
@@ -48,21 +49,30 @@ export class Files {
     return toFileObject(result);
   }
 
-  async list(query: FileListParams = {}, opts?: RequestOpts): Promise<FileObjectList & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: "/files",
-      query: { ...query, sort_by: query.sort_by ?? "created_at" },
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "File list");
-    if (!Array.isArray(body.data)) {
-      throw new APIProtocolError("File list is missing data", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as FileObjectList), http: result.http };
+  list(
+    query: FileListParams = {},
+    opts?: RequestOpts,
+  ): PagePromise<FileObjectList & { http: HttpMeta }, FileObject> {
+    return tokenPages(
+      query,
+      async (pageQuery) => {
+        const result = await send(this.client, {
+          method: "GET",
+          path: "/files",
+          query: { ...pageQuery, sort_by: pageQuery.sort_by ?? "created_at" },
+          opts,
+        });
+        const body = requireRecord(result.payload, result.http, "File list");
+        if (!Array.isArray(body.data)) {
+          throw new APIProtocolError("File list is missing data", {
+            ...requestIds(result.http),
+            body,
+          });
+        }
+        return { ...(body as FileObjectList), http: result.http };
+      },
+      (page) => page.data,
+    );
   }
 
   async get(id: string, opts?: RequestOpts): Promise<FileObject & { http: HttpMeta }> {

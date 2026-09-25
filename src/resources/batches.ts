@@ -1,13 +1,16 @@
 import { combineSignals, send, sleep, type SendResult } from "../http.js";
 import { APIProtocolError, TimeoutError, requestIds } from "../errors.js";
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
+import { tokenPages, type PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type {
   Batch,
   BatchCreateParams,
   BatchList,
   BatchRequest,
+  BatchRequestMetadata,
   BatchRequestMetadataList,
+  BatchResult,
   BatchResultList,
   BatchWaitOptions,
   HttpMeta,
@@ -56,24 +59,30 @@ export class Batches {
     return toBatch(result);
   }
 
-  async list(
+  list(
     query: { limit?: number; pagination_token?: string } = {},
     opts?: RequestOpts,
-  ): Promise<BatchList & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: "/batches",
+  ): PagePromise<BatchList & { http: HttpMeta }, Batch> {
+    return tokenPages(
       query,
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Batch list");
-    if (!Array.isArray(body.batches)) {
-      throw new APIProtocolError("Batch list is missing batches", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as BatchList), http: result.http };
+      async (pageQuery) => {
+        const result = await send(this.client, {
+          method: "GET",
+          path: "/batches",
+          query: pageQuery,
+          opts,
+        });
+        const body = requireRecord(result.payload, result.http, "Batch list");
+        if (!Array.isArray(body.batches)) {
+          throw new APIProtocolError("Batch list is missing batches", {
+            ...requestIds(result.http),
+            body,
+          });
+        }
+        return { ...(body as BatchList), http: result.http };
+      },
+      (page) => page.batches,
+    );
   }
 
   async get(batchId: string, opts?: RequestOpts): Promise<Batch & { http: HttpMeta }> {
@@ -94,25 +103,31 @@ export class Batches {
     return toBatch(result);
   }
 
-  async results(
+  results(
     batchId: string,
     query: { limit?: number; pagination_token?: string } = {},
     opts?: RequestOpts,
-  ): Promise<BatchResultList & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: `/batches/${encodeURIComponent(batchId)}/results`,
+  ): PagePromise<BatchResultList & { http: HttpMeta }, BatchResult> {
+    return tokenPages(
       query,
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Batch result list");
-    if (!Array.isArray(body.results)) {
-      throw new APIProtocolError("Batch result list is missing results", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as BatchResultList), http: result.http };
+      async (pageQuery) => {
+        const result = await send(this.client, {
+          method: "GET",
+          path: `/batches/${encodeURIComponent(batchId)}/results`,
+          query: pageQuery,
+          opts,
+        });
+        const body = requireRecord(result.payload, result.http, "Batch result list");
+        if (!Array.isArray(body.results)) {
+          throw new APIProtocolError("Batch result list is missing results", {
+            ...requestIds(result.http),
+            body,
+          });
+        }
+        return { ...(body as BatchResultList), http: result.http };
+      },
+      (page) => page.results,
+    );
   }
 
   /**
@@ -162,24 +177,30 @@ export class BatchRequests {
     return { http: result.http };
   }
 
-  async list(
+  list(
     batchId: string,
     query: { limit?: number; pagination_token?: string } = {},
     opts?: RequestOpts,
-  ): Promise<BatchRequestMetadataList & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: `/batches/${encodeURIComponent(batchId)}/requests`,
+  ): PagePromise<BatchRequestMetadataList & { http: HttpMeta }, BatchRequestMetadata> {
+    return tokenPages(
       query,
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Batch request list");
-    if (!Array.isArray(body.batch_request_metadata)) {
-      throw new APIProtocolError("Batch request list is missing batch_request_metadata", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as BatchRequestMetadataList), http: result.http };
+      async (pageQuery) => {
+        const result = await send(this.client, {
+          method: "GET",
+          path: `/batches/${encodeURIComponent(batchId)}/requests`,
+          query: pageQuery,
+          opts,
+        });
+        const body = requireRecord(result.payload, result.http, "Batch request list");
+        if (!Array.isArray(body.batch_request_metadata)) {
+          throw new APIProtocolError("Batch request list is missing batch_request_metadata", {
+            ...requestIds(result.http),
+            body,
+          });
+        }
+        return { ...(body as BatchRequestMetadataList), http: result.http };
+      },
+      (page) => page.batch_request_metadata,
+    );
   }
 }

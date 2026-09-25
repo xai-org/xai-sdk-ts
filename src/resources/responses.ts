@@ -3,6 +3,7 @@ import { send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { xAIResponse } from "../response.js";
 import { xAIStream } from "../stream.js";
+import { PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type { CompactParams, CreateParams, RequestOpts } from "../types.js";
 import type { CompactResponse, DeletedResponse, InputItemList } from "../types.js";
@@ -97,24 +98,31 @@ export class Responses {
 export class InputItems {
   constructor(private readonly client: xAI) {}
 
-  async list(
+  list(
     id: string,
     query: { after?: string; limit?: number; order?: "asc" | "desc" } = {},
     opts?: RequestOpts,
-  ): Promise<InputItemList & { http: import("../types.js").HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: `/responses/${encodeURIComponent(id)}/input_items`,
-      query,
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Input item list");
-    if (body.object !== "list" || !Array.isArray(body.data)) {
-      throw new APIProtocolError("Input item list is missing object=list or data", {
-        ...requestIds(result.http),
-        body,
+  ): PagePromise<InputItemList & { http: import("../types.js").HttpMeta }, InputItemList["data"][number]> {
+    const fetchPage = async (pageQuery: typeof query) => {
+      const result = await send(this.client, {
+        method: "GET",
+        path: `/responses/${encodeURIComponent(id)}/input_items`,
+        query: pageQuery,
+        opts,
       });
-    }
-    return { ...(body as InputItemList), http: result.http };
+      const body = requireRecord(result.payload, result.http, "Input item list");
+      if (body.object !== "list" || !Array.isArray(body.data)) {
+        throw new APIProtocolError("Input item list is missing object=list or data", {
+          ...requestIds(result.http),
+          body,
+        });
+      }
+      return { ...(body as InputItemList), http: result.http };
+    };
+    return new PagePromise({
+      first: () => fetchPage(query),
+      next: (page) => (page.has_more && page.last_id ? fetchPage({ ...query, after: page.last_id }) : undefined),
+      items: (page) => page.data,
+    });
   }
 }
