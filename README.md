@@ -21,9 +21,9 @@
   </p>
 </div>
 
-Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image and video generation, file uploads, batch processing, text to speech and transcription, embeddings, document search, multi-turn conversations, and access to usage and HTTP metadata.
+Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image and video generation, file uploads, batch processing, text to speech and transcription, multi-turn conversations, and access to usage and HTTP metadata.
 
-> **Experimental.** This SDK is in early development. It currently covers the Responses API, image and video generation, the Files, Batch, and Voice APIs, embeddings and tokenization, document search, and model and account lookup, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
+> **Experimental.** This SDK is in early development. It currently covers the Responses API, image and video generation, the Files, Batch, and Voice APIs, tokenization, and model and account lookup, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
 
 ## Requirements
 
@@ -717,30 +717,6 @@ const secret = await client.voice.clientSecrets.create({
 
 Send `secret.value` to the browser, which passes `xai-client-secret.<value>` as the WebSocket subprotocol when it connects to `wss://api.x.ai/v1/realtime`. Secrets expire after 10 minutes by default, and `expires_after.seconds` can be at most 3600.
 
-## Embeddings
-
-Create vector embeddings for text with one of the embedding models available to your API key:
-
-```ts
-const { models } = await client.embeddings.models.list();
-const [embeddingModel] = models;
-if (!embeddingModel) throw new Error("No embedding models are available to this API key");
-
-const result = await client.embeddings.create({
-  model: embeddingModel.id,
-  input: ["How do I rotate an API key?", "Create a new key, deploy it, then delete the old key."],
-});
-
-for (const item of result.data) {
-  console.log(item.index, item.embedding);
-}
-console.log(result.usage?.total_tokens);
-```
-
-Pass a string or an array of up to 128 strings as `input`, or token IDs in the same shapes. Set `encoding_format: "base64"` to receive each embedding as a base64 string instead of an array of floats.
-
-The embedding model catalog also includes modalities, aliases, and pricing. `client.embeddings.models.get(id)` returns one model.
-
 ## Tokenization
 
 Encode text with a language model's tokenizer to count its tokens or see how it is split:
@@ -766,27 +742,6 @@ const text = new TextDecoder().decode(
   new Uint8Array(token_ids.flatMap((token) => token.token_bytes)),
 );
 ```
-
-## Document search
-
-Search for the document chunks most relevant to a query within one or more [collections](https://docs.x.ai/developers/files/collections):
-
-```ts
-const results = await client.documents.search({
-  query: "What was the revenue in the last quarter?",
-  source: { collection_ids: ["collection_abc123"] },
-  filter: 'document_type = "financial_report" AND year > 2020',
-  limit: 5,
-});
-
-for (const match of results.matches) {
-  console.log(match.score, match.file_id, match.chunk_content);
-}
-```
-
-`filter` matches the [metadata fields](https://docs.x.ai/developers/files/collections/metadata) defined on a collection, and `retrieval_mode` selects semantic, keyword, or hybrid search.
-
-Search requests use your regular API key. To create collections and upload documents, use the [xAI Console](https://console.x.ai) or the Management API, which this SDK does not cover.
 
 ## Models
 

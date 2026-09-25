@@ -10,8 +10,6 @@ import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
 import { Images } from "./resources/images.js";
 import { Files } from "./resources/files.js";
 import { Batches } from "./resources/batches.js";
-import { Embeddings } from "./resources/embeddings.js";
-import { Documents } from "./resources/documents.js";
 import { Account } from "./resources/account.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
@@ -40,9 +38,7 @@ export class xAI {
   readonly files: Files;
   readonly batches: Batches;
   readonly voice: VoiceResource;
-  readonly embeddings: Embeddings;
   readonly tokenizer: Tokenizer;
-  readonly documents: Documents;
   readonly account: Account;
 
   constructor(opts: ClientOptions = {}) {
@@ -79,9 +75,7 @@ export class xAI {
     this.files = new Files(this);
     this.batches = new Batches(this);
     this.voice = new VoiceResource(this);
-    this.embeddings = new Embeddings(this);
     this.tokenizer = new Tokenizer(this);
-    this.documents = new Documents(this);
     this.account = new Account(this);
   }
 
