@@ -629,7 +629,7 @@ await client.batches.requests.add(batch.batch_id, {
 });
 ```
 
-Each `batch_request` holds one request. `responses` takes the same `CreateParams` as `client.responses.create()`, including the `store: false` default, and its result comes back as a `chat_get_completion` response. `chat_get_completion`, `image_generation`, `image_edit`, `video_generation`, and `video_extension` take the request body of the matching REST endpoint. Results can come back in any order, so give each request a `batch_request_id` that is unique within the batch. Not every model accepts batch requests; each [model page](https://docs.x.ai/developers/models) lists its Batch API support.
+Each `batch_request` holds one request. `responses` takes the same `CreateParams` as `client.responses.create()`, including the `store: false` default, and its result comes back as a `chat_get_completion` response. `image_generation`, `image_edit`, `video_generation`, and `video_extension` take the request body of the matching REST endpoint. Results can come back in any order, so give each request a `batch_request_id` that is unique within the batch. Not every model accepts batch requests; each [model page](https://docs.x.ai/developers/models) lists its Batch API support.
 
 Wait until no requests are pending, then page through the results:
 
@@ -795,14 +795,11 @@ Token prices such as `prompt_text_token_price` are in USD cents per 100 million 
 
 ## Account
 
-`client.account.apiKey()` returns the name, status, and permissions of the API key the client is using. `client.account.me()` returns the caller's user ID, team ID, and Zero Data Retention status:
+`client.account.apiKey()` returns the name, status, and permissions of the API key the client is using:
 
 ```ts
 const apiKeyInfo = await client.account.apiKey();
 console.log(apiKeyInfo.name, apiKeyInfo.acls, apiKeyInfo.api_key_disabled);
-
-const callerInfo = await client.account.me();
-console.log(callerInfo.team_id, callerInfo.zdr_status);
 ```
 
 ## Response storage

@@ -51,18 +51,6 @@ export const batchRequestExamples = [
     },
   },
   {
-    batch_request_id: "test_request_0",
-    batch_request: {
-      chat_get_completion: {
-        model: "grok-4",
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: "What is 101*3?" },
-        ],
-      },
-    },
-  },
-  {
     batch_request_id: "img_001",
     batch_request: {
       image_generation: {
@@ -115,6 +103,11 @@ export const batchRequestExamples = [
 
 // @ts-expect-error Batch requests wrap only the documented request types.
 export const unsupportedRequest: BatchRequest = { batch_request: { embeddings: { input: "hi" } } };
+
+export const chatRequest: BatchRequest = {
+  // @ts-expect-error Text requests go through `responses`, not Chat Completions.
+  batch_request: { chat_get_completion: { model: "grok-4", messages: [{ role: "user", content: "hi" }] } },
+};
 
 export function describeResult({ batch_request_id, batch_result }: BatchResult): string {
   if ("error" in batch_result) return `${batch_request_id} failed: ${batch_result.error}`;

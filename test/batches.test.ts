@@ -212,21 +212,9 @@ describe("batches.wait", () => {
 });
 
 describe("batches.requests", () => {
-  it("adds chat, image, and video requests unchanged", async () => {
+  it("adds image and video requests unchanged", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse({}));
     const batchRequests = [
-      {
-        batch_request_id: "test_request_0",
-        batch_request: {
-          chat_get_completion: {
-            model: "grok-4",
-            messages: [
-              { role: "system", content: "You are a helpful assistant." },
-              { role: "user", content: "What is 101*3?" },
-            ],
-          },
-        },
-      },
       {
         batch_request_id: "img_edit_001",
         batch_request: {

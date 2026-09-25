@@ -29,7 +29,6 @@ export type ModelList = Schema["ListModelsResponse"];
 export type LanguageModel = Schema["LanguageModel"];
 export type LanguageModelList = Schema["ListLanguageModelsResponse"];
 export type ApiKeyInfo = Schema["ApiKey"];
-export type CallerInfo = Schema["GetMeResponse"];
 export type Tool =
   | Exclude<GeneratedTool, GeneratedFunctionTool>
   | (Omit<GeneratedFunctionTool, "parameters"> & {
@@ -225,7 +224,6 @@ export type BatchRequest = {
   batch_request_id?: string | null;
   batch_request:
     | { responses: CreateParams }
-    | { chat_get_completion: Schema["ChatRequest"] }
     | { image_generation: Schema["GenerateImageRequest"] }
     | { image_edit: Schema["EditImageRequest"] }
     | { video_generation: Schema["GenerateVideoRequest"] | Schema["EditVideoRequest"] }

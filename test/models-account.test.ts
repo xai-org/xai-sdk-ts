@@ -39,19 +39,6 @@ const apiKeyInfo = {
   api_key_disabled: false,
 };
 
-const callerInfo = {
-  user_id: apiKeyInfo.user_id,
-  team_id: apiKeyInfo.team_id,
-  zdr_status: "no_zdr",
-  team_blocked: false,
-  api_key: {
-    redacted_api_key: apiKeyInfo.redacted_api_key,
-    api_key_id: apiKeyInfo.api_key_id,
-    blocked: false,
-    disabled: false,
-  },
-};
-
 function client(fetch: typeof globalThis.fetch): xAI {
   return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
@@ -91,17 +78,6 @@ describe("account", () => {
     expect(info).toEqual(apiKeyInfo);
     expect(http.requestId).toBe("req_test");
   });
-
-  it("gets the authenticated caller", async () => {
-    const { fetch, captured } = mockFetch(() => jsonResponse(callerInfo));
-    const { http, ...caller } = await client(fetch).account.me();
-
-    expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      "GET https://api.x.ai/v1/me",
-    ]);
-    expect(caller).toEqual(callerInfo);
-    expect(http.requestId).toBe("req_test");
-  });
 });
 
 type Call = (c: xAI) => Promise<unknown>;
@@ -109,7 +85,6 @@ type Call = (c: xAI) => Promise<unknown>;
 const listLanguageModels: Call = (c) => c.models.language.list();
 const getLanguageModel: Call = (c) => c.models.language.get("grok-4.6");
 const getApiKey: Call = (c) => c.account.apiKey();
-const getCaller: Call = (c) => c.account.me();
 
 describe("language model and account response validation", () => {
   it.each<[string, Call, unknown]>([
@@ -119,8 +94,6 @@ describe("language model and account response validation", () => {
     ["a language model without an id", getLanguageModel, { object: "model" }],
     ["a non-object API key body", getApiKey, "not json"],
     ["an API key without api_key_id", getApiKey, { name: apiKeyInfo.name }],
-    ["a non-object caller body", getCaller, null],
-    ["a caller without user_id", getCaller, { team_id: callerInfo.team_id }],
   ])("rejects %s", async (_label, call, payload) => {
     const { fetch } = mockFetch(() => jsonResponse(payload));
     await expect(call(client(fetch))).rejects.toBeInstanceOf(APIProtocolError);

@@ -53,7 +53,6 @@ export type {
   BatchResult,
   BatchResultList,
   BatchWaitOptions,
-  CallerInfo,
   ClientOptions,
   ClientSecret,
   ClientSecretCreateParams,
