@@ -6,6 +6,8 @@ import type {
   OutputMessage,
   ReasoningItem,
   Tool,
+  xAIResponse,
+  xAIStream,
   xAIStreamEvent,
 } from "../src/index.js";
 
@@ -44,6 +46,15 @@ export type ReasoningHasLiteralType = Assert<
 export type StreamEventTypesAreKnown = Assert<
   Equals<KnownStreamEventType, Exclude<xAIStreamEvent["type"], "unknown">>
 >;
+export type StreamDoneResolvesToResponse = Assert<
+  Equals<Awaited<ReturnType<xAIStream["done"]>>, xAIResponse>
+>;
+
+export function listenForText(stream: xAIStream): xAIStream {
+  // @ts-expect-error only text events are supported
+  stream.on("reasoning", () => {});
+  return stream.on("text", (text: string) => text.length);
+}
 
 export const requestExamples = [
   {

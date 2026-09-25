@@ -1,5 +1,6 @@
 import { isKnownStreamEventType, MAX_STREAM_INDEX } from "./constants.js";
 import {
+  AbortError,
   APIError,
   APIProtocolError,
   TimeoutError,
@@ -9,6 +10,7 @@ import {
 } from "./errors.js";
 import { parseSse } from "./sse.js";
 import { parseJsonOutput, toInput, toText } from "./porcelain.js";
+import { xAIResponse } from "./response.js";
 import { emptyUsage, mapUsage, type Usage } from "./usage.js";
 import type { HttpMeta, IncompleteDetails, InputItem, OutputItem, xAIStreamEvent } from "./types.js";
 
@@ -32,6 +34,10 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
   #closeController = new AbortController();
   #requestId: string | null;
   #signal: AbortSignal | undefined;
+  #textListeners: ((text: string) => void)[] = [];
+  #final: Record<string, unknown> | undefined;
+  #ended = Promise.withResolvers<void>();
+  #done: Promise<xAIResponse> | undefined;
 
   constructor(init: {
     body: ReadableStream<Uint8Array> | null;
@@ -42,6 +48,8 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     this.#body = init.body;
     this.#requestId = init.http.requestId;
     this.#signal = init.signal;
+    // Keeps an iteration error from becoming an unhandled rejection when done() is never called.
+    this.#ended.promise.catch(() => {});
   }
 
   get parsed(): unknown | null {
@@ -58,6 +66,25 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
 
   toJson(): unknown {
     return parseJsonOutput(this.output, this.status, true);
+  }
+
+  /** Calls `listener` with each chunk of answer text, whether a loop or `done()` reads the stream. */
+  on(event: "text", listener: (text: string) => void): this {
+    if (event !== "text") throw new TypeError(`Unsupported stream event: ${String(event)}`);
+    this.#textListeners.push(listener);
+    return this;
+  }
+
+  /**
+   * Reads the rest of the stream, unless a loop is already reading it, and resolves to the final response.
+   * Rejects if the stream fails or closes before the response completes.
+   */
+  done(): Promise<xAIResponse> {
+    if (!this.#done) {
+      if (!this.#consumed) void this.#drain();
+      this.#done = this.#ended.promise.then(() => this.#finalResponse());
+    }
+    return this.#done;
   }
 
   async close(): Promise<void> {
@@ -78,6 +105,43 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
   async *[Symbol.asyncIterator](): AsyncGenerator<xAIStreamEvent> {
     if (this.#consumed) throw new Error("Stream already iterated");
     this.#consumed = true;
+    try {
+      for await (const event of this.#events()) {
+        if (event.type === "response.output_text.delta") {
+          for (const listener of this.#textListeners) listener(event.delta);
+        }
+        yield event;
+      }
+    } catch (err) {
+      this.#ended.reject(err);
+      throw err;
+    } finally {
+      this.#ended.resolve();
+    }
+  }
+
+  async #drain(): Promise<void> {
+    try {
+      for await (const _ of this) {
+        // text listeners run inside the iterator
+      }
+    } catch {
+      // done() reports the error
+    }
+  }
+
+  #finalResponse(): xAIResponse {
+    if (APIError.is(this.error)) throw this.error;
+    if (!this.#final) {
+      throw new AbortError("Stream closed before the response completed", {
+        requestId: this.#requestId,
+        clientRequestId: this.http.clientRequestId,
+      });
+    }
+    return new xAIResponse(this.#final, this.http);
+  }
+
+  async *#events(): AsyncGenerator<xAIStreamEvent> {
     if (!this.#body) return;
     try {
       for await (const raw of parseSse(this.#body, {
@@ -212,6 +276,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
         body: response,
       });
     }
+    if (terminal) this.#final = response;
     if (typeof response.id === "string") this.id = response.id;
     if (typeof response.status === "string") this.status = response.status;
     if (typeof response.model === "string") this.model = response.model;

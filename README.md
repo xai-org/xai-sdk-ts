@@ -68,7 +68,7 @@ Keep API keys on the server. The SDK blocks browser and Worker use by default be
 
 ## Streaming
 
-Set `stream: true` and iterate over the server-sent events. The stream accumulates the final response as events arrive.
+Set `stream: true` to receive output as it's generated. Listen for answer text with `on("text")`, then `await stream.done()` for the final response:
 
 ```ts
 const stream = await client.responses.create({
@@ -77,13 +77,25 @@ const stream = await client.responses.create({
   stream: true,
 });
 
+const response = await stream
+  .on("text", (text) => process.stdout.write(text))
+  .done();
+
+console.log(`\n${response.usage.total_tokens} tokens`);
+```
+
+`done()` resolves to the same response object a non-streamed request returns. It rejects if the stream fails or closes before the response completes.
+
+To handle every server-sent event, such as reasoning or function-call argument deltas, iterate over the stream instead. The stream accumulates the final response as events arrive:
+
+```ts
 for await (const event of stream) {
-  if (event.type === "response.output_text.delta") {
+  if (event.type === "response.function_call_arguments.delta") {
     process.stdout.write(event.delta);
   }
 }
 
-console.log(`\n${stream.usage.total_tokens} tokens`);
+console.log(stream.toText());
 ```
 
 After iteration completes, the stream exposes `toText()`, `toInput()`, `toJson()`, `parsed`, `id`, `status`, `output`, `usage`, and `http`.
@@ -861,6 +873,8 @@ await pending;
 ```
 
 Requests that generate content, such as `responses.create`, `images.generate`, and `images.edit`, retry only explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and use jittered exponential backoff.
+
+On Node, the built-in `fetch` gives up if response headers take longer than 5 minutes, whatever `timeout` is set to. For requests that may run longer, such as long reasoning tasks, set `stream: true` and `await stream.done()`. Streamed responses send headers right away, and `done()` resolves to the same response object.
 
 ## Errors
 

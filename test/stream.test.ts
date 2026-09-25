@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { APIError, TimeoutError, isImageGenerationCall, xAI } from "../src/index.js";
+import {
+  APIError,
+  APIProtocolError,
+  AbortError,
+  TimeoutError,
+  isImageGenerationCall,
+  xAI,
+  xAIResponse,
+} from "../src/index.js";
 import { completedResponse, createBody, mockFetch, sseResponse, usageFixture } from "./helpers.js";
 
 describe("responses.create stream", () => {
@@ -241,5 +249,99 @@ describe("responses.create stream", () => {
     expect((caught as TimeoutError).requestId).toBe("req_test");
     expect(types).toContain("ping");
     expect(cancelled).toBe(true);
+  });
+});
+
+describe("stream.on and stream.done", () => {
+  const events = [
+    { type: "response.created", response: { id: "resp_s", status: "in_progress", output: [] } },
+    { type: "response.reasoning_summary_text.delta", output_index: 0, delta: "think" },
+    { type: "response.output_text.delta", output_index: 1, content_index: 0, delta: "Hello" },
+    { type: "response.output_text.delta", output_index: 1, content_index: 0, delta: " world" },
+    { type: "response.completed", response: completedResponse },
+  ];
+
+  async function streamOf(sse: unknown[], init: { hang?: boolean } = {}) {
+    const { fetch } = mockFetch(() => sseResponse(sse, init));
+    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    return client.responses.create({ ...createBody, stream: true });
+  }
+
+  it("sends answer text to listeners and resolves done() to the final response", async () => {
+    const stream = await streamOf(events);
+    const texts: string[] = [];
+    const response = await stream.on("text", (text) => texts.push(text)).done();
+    expect(texts).toEqual(["Hello", " world"]);
+    expect(response).toBeInstanceOf(xAIResponse);
+    expect(response.id).toBe("resp_123");
+    expect(response.toText()).toBe("Hello world");
+    expect(response.usage.cost_usd).toBe(1.5);
+    expect(response.http.requestId).toBe("req_test");
+    expect(stream.done()).toBe(stream.done());
+  });
+
+  it("waits for a loop that is already reading the stream", async () => {
+    const stream = await streamOf(events);
+    const texts: string[] = [];
+    stream.on("text", (text) => texts.push(text));
+    const types: string[] = [];
+    let pending: Promise<xAIResponse> | undefined;
+    for await (const event of stream) {
+      pending ??= stream.done();
+      types.push(event.type);
+    }
+    const response = await pending;
+    expect(types).toEqual(events.map((event) => event.type));
+    expect(texts).toEqual(["Hello", " world"]);
+    expect(response?.toText()).toBe("Hello world");
+    expect(await stream.done()).toBe(response);
+  });
+
+  it("resolves failed responses like a non-streamed request", async () => {
+    const error = { code: "server_error", message: "boom" };
+    const stream = await streamOf([
+      { type: "response.failed", response: { ...completedResponse, status: "failed", output: [], error } },
+    ]);
+    const response = await stream.done();
+    expect(response.status).toBe("failed");
+    expect(response.error).toEqual(error);
+  });
+
+  it("rejects with a mid-stream error event", async () => {
+    const stream = await streamOf([
+      { type: "response.created", response: { id: "resp_s", status: "in_progress", output: [] } },
+      { type: "error", code: 529, message: "overloaded" },
+    ]);
+    const error = await stream.done().catch((err: unknown) => err);
+    expect(APIError.is(error) && error.isOverloaded()).toBe(true);
+  });
+
+  it("rejects when the stream ends without a terminal event", async () => {
+    const stream = await streamOf(events.slice(0, 3));
+    await expect(stream.done()).rejects.toBeInstanceOf(APIProtocolError);
+  });
+
+  it("rejects when the stream closes before the response completes", async () => {
+    const stream = await streamOf(events.slice(0, 3), { hang: true });
+    stream.on("text", () => void stream.close());
+    const error = await stream.done().catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(AbortError);
+    expect((error as AbortError).clientRequestId).toBe(stream.http.clientRequestId);
+  });
+
+  it("stops the stream and rejects with the error a listener throws", async () => {
+    const stream = await streamOf(events);
+    const boom = new Error("listener failed");
+    const failing = stream.on("text", () => {
+      throw boom;
+    });
+    await expect(failing.done()).rejects.toBe(boom);
+    expect(stream.status).toBe("in_progress");
+  });
+
+  it("rejects unsupported event names", async () => {
+    const stream = await streamOf(events);
+    expect(() => stream.on("reasoning" as "text", () => {})).toThrow(TypeError);
+    await stream.close();
   });
 });
