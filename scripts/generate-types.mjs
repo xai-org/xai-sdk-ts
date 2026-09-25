@@ -43,15 +43,10 @@ const KEEP_PATHS = new Set([
   "/v1/videos/{request_id}",
   "/v1/video-generation-models",
   "/v1/video-generation-models/{model_id}",
-  "/v1/embeddings",
-  "/v1/embedding-models",
-  "/v1/embedding-models/{model_id}",
   "/v1/tokenize-text",
   "/v1/language-models",
   "/v1/language-models/{model_id}",
   "/v1/api-key",
-  "/v1/me",
-  "/v1/documents/search",
 ]);
 
 function specRef() {
