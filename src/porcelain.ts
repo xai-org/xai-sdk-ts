@@ -181,9 +181,6 @@ export type ImageEditWireBody = Omit<ImageEditParams, "image" | "images"> & {
   images?: Exclude<ImageInput, Blob>[];
 };
 
-/**
- * Convert porcelain `Blob | File` edit inputs to wire `{ url }` data URLs.
- */
 export async function inlineImageInputs(
   body: ImageEditParams,
   signal?: AbortSignal,
