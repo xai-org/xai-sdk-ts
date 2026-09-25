@@ -3,6 +3,9 @@ import { errorFromAbort } from "./errors.js";
 import type {
   CreateParams,
   FunctionToolCall,
+  ImageEditParams,
+  ImageGenerationCall,
+  ImageInput,
   InputItem,
   OutputItem,
   OutputMessage,
@@ -23,6 +26,10 @@ export function isReasoning(item: unknown): item is ReasoningItem {
 
 export function isFunctionCall(item: unknown): item is FunctionToolCall {
   return isRecord(item) && item.type === "function_call";
+}
+
+export function isImageGenerationCall(item: unknown): item is ImageGenerationCall {
+  return isRecord(item) && item.type === "image_generation_call";
 }
 
 export function toText(output: readonly OutputItem[]): string {
@@ -99,6 +106,20 @@ async function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<
   });
 }
 
+function hasBytes(bytes: Uint8Array, offset: number, expected: readonly number[]): boolean {
+  return expected.every((byte, index) => bytes[offset + index] === byte);
+}
+
+/** The API rejects image data URLs that are not typed as JPEG, PNG, or WebP. */
+function sniffImageType(bytes: Uint8Array): string {
+  if (hasBytes(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (hasBytes(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "image/png";
+  if (hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && hasBytes(bytes, 8, [0x57, 0x45, 0x42, 0x50])) {
+    return "image/webp";
+  }
+  return "application/octet-stream";
+}
+
 async function blobToDataUrl(blob: Blob, signal?: AbortSignal): Promise<string> {
   assertNotAborted(signal);
   const bytes = new Uint8Array(await abortable(blob.arrayBuffer(), signal));
@@ -109,7 +130,8 @@ async function blobToDataUrl(blob: Blob, signal?: AbortSignal): Promise<string> 
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   const b64 = btoa(binary);
-  const mime = blob.type || "application/octet-stream";
+  const mime =
+    blob.type && blob.type !== "application/octet-stream" ? blob.type : sniffImageType(bytes);
   return `data:${mime};base64,${b64}`;
 }
 
@@ -145,6 +167,36 @@ export async function inlineBlobs(
   assertNotAborted(signal);
   if (typeof input === "string") return input;
   return (await inlineValue(input, signal)) as InputItem[];
+}
+
+export async function inlineImageInput(
+  image: ImageInput,
+  signal?: AbortSignal,
+): Promise<Exclude<ImageInput, Blob>> {
+  return isBlobLike(image) ? { url: await blobToDataUrl(image, signal) } : image;
+}
+
+export type ImageEditWireBody = Omit<ImageEditParams, "image" | "images"> & {
+  image?: Exclude<ImageInput, Blob>;
+  images?: Exclude<ImageInput, Blob>[];
+};
+
+/**
+ * Convert porcelain `Blob | File` edit inputs to wire `{ url }` data URLs.
+ */
+export async function inlineImageInputs(
+  body: ImageEditParams,
+  signal?: AbortSignal,
+): Promise<ImageEditWireBody> {
+  assertNotAborted(signal);
+  const { image, images, ...rest } = body;
+  const out: ImageEditWireBody = rest;
+  if (image != null) out.image = await inlineImageInput(image, signal);
+  if (images != null) {
+    out.images = [];
+    for (const item of images) out.images.push(await inlineImageInput(item, signal));
+  }
+  return out;
 }
 
 /**

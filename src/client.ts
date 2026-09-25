@@ -7,8 +7,17 @@ import {
 } from "./constants.js";
 import { storeApiKey } from "./credentials.js";
 import { assertNodeVersion, isBrowser, isNode, readEnvApiKey } from "./env.js";
+import { Images } from "./resources/images.js";
+import { Files } from "./resources/files.js";
+import { Batches } from "./resources/batches.js";
+import { Embeddings } from "./resources/embeddings.js";
+import { Documents } from "./resources/documents.js";
+import { Account } from "./resources/account.js";
 import { ModelsResource } from "./resources/models.js";
 import { Responses } from "./resources/responses.js";
+import { Videos } from "./resources/videos.js";
+import { VoiceResource } from "./resources/voice.js";
+import { Tokenizer } from "./resources/tokenizer.js";
 import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
 
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
@@ -26,6 +35,15 @@ export class xAI {
   readonly onResponse?: ResponseHook;
   readonly responses: Responses;
   readonly models: ModelsResource;
+  readonly images: Images;
+  readonly videos: Videos;
+  readonly files: Files;
+  readonly batches: Batches;
+  readonly voice: VoiceResource;
+  readonly embeddings: Embeddings;
+  readonly tokenizer: Tokenizer;
+  readonly documents: Documents;
+  readonly account: Account;
 
   constructor(opts: ClientOptions = {}) {
     assertNodeVersion();
@@ -56,6 +74,15 @@ export class xAI {
     this.onResponse = opts.onResponse;
     this.responses = new Responses(this);
     this.models = new ModelsResource(this);
+    this.images = new Images(this);
+    this.videos = new Videos(this);
+    this.files = new Files(this);
+    this.batches = new Batches(this);
+    this.voice = new VoiceResource(this);
+    this.embeddings = new Embeddings(this);
+    this.tokenizer = new Tokenizer(this);
+    this.documents = new Documents(this);
+    this.account = new Account(this);
   }
 
   [INSPECT](): object {

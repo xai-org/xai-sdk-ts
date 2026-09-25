@@ -67,6 +67,50 @@ describe("responses.create", () => {
     expect(res.usage.input_tokens).toBe(0);
     expect(res.usage.cost_usd).toBeNull();
     expect(res.usage.cost_in_nano_usd).toBeNull();
+    expect(res.usage.cost_in_usd_ticks).toBeNull();
+  });
+
+  it("derives cost_usd from cost_in_usd_ticks and keeps unmapped usage fields", async () => {
+    const contextDetails = { input_tokens: 32, output_tokens: 119 };
+    const toolDetails = { web_search_calls: 1, x_search_calls: 0 };
+    const { fetch } = mockFetch(() =>
+      jsonResponse({
+        ...completedResponse,
+        usage: {
+          ...usageFixture,
+          cost_in_nano_usd: undefined,
+          context_details: contextDetails,
+          server_side_tool_usage_details: toolDetails,
+        },
+      }),
+    );
+    const res = await client(fetch).responses.create(createBody);
+    expect(res.usage.cost_in_nano_usd).toBeNull();
+    expect(res.usage.cost_in_usd_ticks).toBe(15_000_000_000);
+    expect(res.usage.cost_usd).toBe(1.5);
+    expect(res.usage.context_details).toEqual(contextDetails);
+    expect(res.usage.server_side_tool_usage_details).toEqual(toolDetails);
+  });
+
+  it("falls back to cost_in_nano_usd when the API omits cost_in_usd_ticks", async () => {
+    const { fetch } = mockFetch(() =>
+      jsonResponse({ ...completedResponse, usage: { ...usageFixture, cost_in_usd_ticks: undefined } }),
+    );
+    const res = await client(fetch).responses.create(createBody);
+    expect(res.usage.cost_in_usd_ticks).toBeNull();
+    expect(res.usage.cost_in_nano_usd).toBe(1_500_000_000);
+    expect(res.usage.cost_usd).toBe(1.5);
+  });
+
+  it("prefers cost_in_usd_ticks over cost_in_nano_usd", async () => {
+    const { fetch } = mockFetch(() =>
+      jsonResponse({
+        ...completedResponse,
+        usage: { ...usageFixture, cost_in_nano_usd: 1_000_000_000, cost_in_usd_ticks: 12_345_678_901 },
+      }),
+    );
+    const res = await client(fetch).responses.create(createBody);
+    expect(res.usage.cost_usd).toBe(1.2345678901);
   });
 
   it("returns raw body when http.body is true", async () => {
@@ -146,6 +190,19 @@ describe("responses.create", () => {
     expect(image?.type).toBe("input_image");
     expect(image?.image_url).toMatch(/^data:image\/png;base64,/);
     expect(image).not.toHaveProperty("image");
+  });
+
+  it("detects the image type of an untyped Blob image part", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await client(fetch).responses.create({
+      model: "grok-4.6",
+      input: [{ role: "user", content: [{ type: "input_image", image: new Blob([png]) }] }],
+    });
+    const body = (await captured.requests[0]?.json()) as {
+      input: Array<{ content: Array<{ image_url?: string }> }>;
+    };
+    expect(body.input[0]?.content[0]?.image_url).toMatch(/^data:image\/png;base64,/);
   });
 
   it("get/delete/inputItems.list/models hit the documented paths", async () => {

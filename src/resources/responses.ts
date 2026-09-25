@@ -3,23 +3,10 @@ import { send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { xAIResponse } from "../response.js";
 import { xAIStream } from "../stream.js";
-import type { CreateParams, HttpMeta, RequestOpts } from "../types.js";
-import type { DeletedResponse, InputItemList } from "../types.js";
+import { requireRecord } from "./shared.js";
+import type { CompactParams, CreateParams, RequestOpts } from "../types.js";
+import type { CompactResponse, DeletedResponse, InputItemList } from "../types.js";
 import type { xAI } from "../client.js";
-
-function requireRecord(
-  payload: unknown,
-  http: HttpMeta,
-  label: string,
-): Record<string, unknown> {
-  if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
-    return payload as Record<string, unknown>;
-  }
-  throw new APIProtocolError(`${label} must be a JSON object`, {
-    ...requestIds(http),
-    body: payload,
-  });
-}
 
 export class Responses {
   readonly inputItems: InputItems;
@@ -56,6 +43,27 @@ export class Responses {
       });
     }
     return new xAIResponse(result.payload, result.http);
+  }
+
+  async compact(
+    body: CompactParams,
+    opts?: RequestOpts,
+  ): Promise<CompactResponse & { http: import("../types.js").HttpMeta }> {
+    const input = await inlineBlobs(body.input, opts?.signal);
+    const result = await send(this.client, {
+      method: "POST",
+      path: "/responses/compact",
+      body: { ...body, input },
+      opts,
+    });
+    const compacted = requireRecord(result.payload, result.http, "Compact response");
+    if (typeof compacted.id !== "string" || !Array.isArray(compacted.output)) {
+      throw new APIProtocolError("Compact response is missing id or output", {
+        ...requestIds(result.http),
+        body: compacted,
+      });
+    }
+    return { ...(compacted as CompactResponse), http: result.http };
   }
 
   async get(id: string, opts?: RequestOpts): Promise<xAIResponse> {

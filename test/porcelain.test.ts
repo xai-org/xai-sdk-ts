@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isFunctionCall, isMessage, isReasoning, xAI } from "../src/index.js";
+import { inlineImageInput } from "../src/porcelain.js";
 import {
   completedResponse,
   createBody,
@@ -110,5 +111,26 @@ describe("porcelain", () => {
     expect(stream.toText()).toBe('{"ok":');
     expect(stream.parsed).toBeNull();
     expect(() => stream.toJson()).toThrow(/truncated/);
+  });
+
+  it("inlineImageInput converts Blob and File inputs to typed data URLs", async () => {
+    const webp = [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50];
+    const cases: Array<[Blob, string]> = [
+      [new File(["png"], "cat.png", { type: "image/png" }), "image/png"],
+      [new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]), "image/jpeg"],
+      [new Blob([new Uint8Array(webp)], { type: "application/octet-stream" }), "image/webp"],
+      [new Blob(["not an image"]), "application/octet-stream"],
+    ];
+    for (const [image, type] of cases) {
+      const base64 = Buffer.from(await image.arrayBuffer()).toString("base64");
+      expect(await inlineImageInput(image)).toEqual({ url: `data:${type};base64,${base64}` });
+    }
+  });
+
+  it("inlineImageInput passes URL and file_id inputs through", async () => {
+    const url = { url: "https://example.com/cat.png" };
+    const file = { file_id: "file_1" };
+    expect(await inlineImageInput(url)).toBe(url);
+    expect(await inlineImageInput(file)).toBe(file);
   });
 });

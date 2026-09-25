@@ -36,6 +36,9 @@ export const KNOWN_STREAM_EVENT_TYPES = [
   "response.reasoning_summary_text.done",
   "response.function_call_arguments.delta",
   "response.function_call_arguments.done",
+  "response.image_generation_call.in_progress",
+  "response.image_generation_call.generating",
+  "response.image_generation_call.completed",
 ] as const;
 
 export type KnownStreamEventType = (typeof KNOWN_STREAM_EVENT_TYPES)[number];

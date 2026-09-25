@@ -4,10 +4,11 @@ import {
   APIConnectionError,
   APIError,
   APIProtocolError,
+  AbortError,
   TimeoutError,
   xAI,
 } from "../src/index.js";
-import { formatCurl, retryDelayMs, shouldRetryStatus } from "../src/http.js";
+import { formatCurl, retryDelayMs, send, shouldRetryStatus } from "../src/http.js";
 import {
   completedResponse,
   createBody,
@@ -66,6 +67,8 @@ describe("http helpers", () => {
     expect(curl).toContain("accept: application/json");
     expect(curl).toContain("Request body omitted");
     expect(curl).not.toContain("sensitive-prompt");
+    const multipartCurl = formatCurl("POST", "https://api.x.ai/v1/files", headers, new FormData());
+    expect(multipartCurl).toContain("Request body omitted");
   });
 });
 
@@ -359,6 +362,130 @@ describe("client request IDs", () => {
       // Drain the error event.
     }
     expect(failing.error).toMatchObject({ clientRequestId: sentId(failed.captured) });
+  });
+});
+
+describe("multipart requests and binary responses", () => {
+  const download = { method: "GET", path: "/files/file_1/content", binary: true };
+
+  function octetStream(body: BodyInit): Response {
+    return new Response(body, {
+      headers: { "content-type": "application/octet-stream", "x-request-id": "req_test" },
+    });
+  }
+
+  function hangingBody(onCancel?: () => void): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+      },
+      cancel: onCancel,
+    });
+  }
+
+  it("sends FormData as multipart on every attempt", async () => {
+    const bytes = new Uint8Array([0x00, 0xff, 0x10, 0x80]);
+    const form = new FormData();
+    form.append("file", new Blob([bytes]), "data.bin");
+    const { fetch, captured } = mockFetch((_req, n) => {
+      if (n === 1) {
+        return jsonResponse(
+          { error: { message: "rate limited" } },
+          { status: 429, headers: { "retry-after": "0" } },
+        );
+      }
+      return jsonResponse({ id: "file_1" });
+    });
+    const result = await send(new xAI({ apiKey: "k", fetch, maxRetries: 1 }), {
+      method: "POST",
+      path: "/files",
+      body: form,
+    });
+    expect(result.payload).toEqual({ id: "file_1" });
+    expect(captured.requests).toHaveLength(2);
+    for (const request of captured.requests) {
+      expect(request.headers.get("content-type")).toMatch(/^multipart\/form-data; boundary=/);
+      const file = (await request.formData()).get("file");
+      expect(file).toBeInstanceOf(File);
+      expect(new Uint8Array(await (file as File).arrayBuffer())).toEqual(bytes);
+    }
+  });
+
+  it("returns binary bodies byte-for-byte without the JSON size cap", async () => {
+    const bytes = new Uint8Array([0xff, 0xfe, 0x00, 0xc3, 0x28, 0x80]);
+    const { fetch, captured } = mockFetch(() => octetStream(bytes));
+    const result = await send(
+      new xAI({ apiKey: "k", fetch, maxRetries: 0, maxResponseBodyBytes: 2 }),
+      download,
+    );
+    expect(captured.requests[0]?.headers.get("accept")).toBe("*/*");
+    expect(result.http.requestId).toBe("req_test");
+    expect(new Uint8Array(await new Response(result.body).arrayBuffer())).toEqual(bytes);
+  });
+
+  it("keeps a caller accept header on binary requests", async () => {
+    const { fetch, captured } = mockFetch(() => octetStream("ID3"));
+    await send(new xAI({ apiKey: "k", fetch, maxRetries: 0 }), {
+      ...download,
+      opts: { headers: { accept: "audio/mpeg" } },
+    });
+    expect(captured.requests[0]?.headers.get("accept")).toBe("audio/mpeg");
+  });
+
+  it("returns a null body for a binary 204 response", async () => {
+    const { fetch } = mockFetch(() => new Response(null, { status: 204, headers: { "x-request-id": "req_test" } }));
+    const result = await send(new xAI({ apiKey: "k", fetch, maxRetries: 0 }), download);
+    expect(result.http.status).toBe(204);
+    expect(result.body).toBeNull();
+  });
+
+  it("times out an idle binary body and cancels it", async () => {
+    let cancelled = false;
+    const body = hangingBody(() => {
+      cancelled = true;
+    });
+    const { fetch } = mockFetch(() => octetStream(body));
+    const result = await send(
+      new xAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 }),
+      download,
+    );
+    await expect(new Response(result.body).arrayBuffer()).rejects.toBeInstanceOf(TimeoutError);
+    expect(cancelled).toBe(true);
+  });
+
+  it("attaches the client request ID when a binary body fails mid-read", async () => {
+    const { fetch, captured } = mockFetch(() => octetStream(hangingBody()));
+    const file = await new xAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 }).files.content("file_1");
+    await expect(file.arrayBuffer()).rejects.toMatchObject({
+      name: "TimeoutError",
+      clientRequestId: captured.requests[0]?.headers.get("x-client-request-id"),
+    });
+  });
+
+  it("aborts a binary body mid-read", async () => {
+    const ac = new AbortController();
+    const { fetch } = mockFetch(() => octetStream(hangingBody()));
+    const result = await send(new xAI({ apiKey: "k", fetch, maxRetries: 0 }), {
+      ...download,
+      opts: { signal: ac.signal },
+    });
+    const reader = result.body!.getReader();
+    expect((await reader.read()).value).toEqual(new Uint8Array([1, 2, 3]));
+    const next = reader.read();
+    ac.abort();
+    await expect(next).rejects.toBeInstanceOf(AbortError);
+  });
+
+  it("maps error statuses on binary requests to the usual error classes", async () => {
+    const { fetch } = mockFetch(() =>
+      jsonResponse({ error: { message: "File not found" } }, { status: 404 }),
+    );
+    await expect(send(new xAI({ apiKey: "k", fetch, maxRetries: 0 }), download)).rejects.toMatchObject({
+      name: "NotFoundError",
+      status: 404,
+      message: "File not found",
+      requestId: "req_test",
+    });
   });
 });
 

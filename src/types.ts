@@ -1,5 +1,8 @@
-import type { components } from "./generated/types.js";
-import type { ModelId } from "./models.js";
+import type { components, operations } from "./generated/types.js";
+import type { RealtimeModelId, TranscriptionModelId, VoiceId } from "./generated/voice.js";
+import type { ImageModelId, ModelId, VideoModelId } from "./models.js";
+import type { SpeechText } from "./speech-tags.js";
+import type { MediaUsage } from "./usage.js";
 
 type Schema = components["schemas"];
 type GeneratedTool = Schema["ModelTool"];
@@ -17,11 +20,16 @@ export type FunctionToolCall = Omit<Schema["FunctionToolCall"], "type"> & {
 export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
   type: "reasoning";
 };
+export type ImageGenerationCall = Schema["ImageGenerationCall"];
 export type IncompleteDetails = Schema["IncompleteDetails"];
 export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
 export type InputItemList = Schema["ListInputItemsResponse"];
 export type Model = Schema["Model"];
 export type ModelList = Schema["ListModelsResponse"];
+export type LanguageModel = Schema["LanguageModel"];
+export type LanguageModelList = Schema["ListLanguageModelsResponse"];
+export type ApiKeyInfo = Schema["ApiKey"];
+export type CallerInfo = Schema["GetMeResponse"];
 export type Tool =
   | Exclude<GeneratedTool, GeneratedFunctionTool>
   | (Omit<GeneratedFunctionTool, "parameters"> & {
@@ -66,6 +74,379 @@ export type CreateParams = Omit<
    */
   store?: boolean | null;
 };
+
+export type CompactParams = Omit<Schema["CompactRequest"], "input" | "model"> & {
+  model: ModelId;
+  input: string | InputItem[];
+};
+export type CompactResponse = Schema["CompactResponse"];
+
+/** Blob and File values are client-only: inlined to a `url` data URL before send. */
+export type ImageInput = Schema["ImageUrl"] | Blob | File;
+
+type ImageRequestFields = {
+  model: ImageModelId;
+  prompt: string;
+  response_format?: "url" | "b64_json" | null;
+  /** Defaults to `auto`. Only supported by `grok-imagine-image-2.0`. */
+  quality?: "low" | "medium" | "auto" | null;
+};
+
+export type ImageGenerateParams = Omit<
+  Schema["GenerateImageRequest"],
+  keyof ImageRequestFields
+> &
+  ImageRequestFields;
+
+export type ImageEditParams = Omit<
+  Schema["EditImageRequest"],
+  keyof ImageRequestFields | "image" | "images"
+> &
+  ImageRequestFields &
+  (
+    | { image: ImageInput; images?: never }
+    | {
+        /** Refer to them as `<IMAGE_0>`, `<IMAGE_1>`, and so on in the prompt. */
+        images: ImageInput[];
+        image?: never;
+      }
+  );
+
+export type GeneratedImage = Schema["GeneratedImage"];
+export type ImageResponse = Omit<Schema["GeneratedImageResponse"], "usage"> & {
+  usage: MediaUsage | null;
+  http: HttpMeta;
+};
+export type ImageGenerationModel = Schema["ImageGenerationModel"];
+export type ImageGenerationModelList = Schema["ListImageGenerationModelsResponse"];
+
+type VideoKeyframe = Omit<Schema["VideoKeyframe"], "image"> & { image: ImageInput };
+
+export type VideoGenerateParams = Omit<
+  Schema["GenerateVideoRequest"],
+  "model" | "image" | "reference_images" | "keyframes"
+> & {
+  model: VideoModelId;
+  image?: ImageInput | null;
+  reference_images?: ImageInput[];
+  keyframes?: VideoKeyframe[];
+};
+
+export type VideoEditParams = Omit<Schema["EditVideoRequest"], "model"> & {
+  model: VideoModelId;
+};
+
+export type VideoExtendParams = Omit<Schema["ExtendVideoRequest"], "model"> & {
+  model: VideoModelId;
+};
+
+export type VideoStartResponse = Schema["StartDeferredResponse"];
+export type GeneratedVideo = Schema["GeneratedVideo"];
+/** `status` is `pending`, `done`, `failed`, or `expired`. */
+export type VideoResponse = Omit<Schema["VideoResponse"], "usage"> & {
+  usage: MediaUsage | null;
+  http: HttpMeta;
+};
+
+export type VideoWaitOptions = {
+  /** Milliseconds between polls. Defaults to 5000. */
+  interval?: number;
+  /** Maximum total wait in milliseconds. Defaults to 600000 (10 minutes). */
+  timeout?: number;
+  signal?: AbortSignal;
+};
+
+export type VideoGenerationModel = Schema["VideoGenerationModel"];
+export type VideoGenerationModelList = Schema["ListVideoGenerationModelsResponse"];
+
+/**
+ * The API records the multipart filename as the file's `filename`. It defaults to the
+ * `File` name; FormData would send a plain `Blob` as `blob`.
+ */
+export type FileUploadParams = Omit<Schema["UploadFileMultipartRequest"], "file"> &
+  ({ file: File; filename?: string } | { file: Blob; filename: string });
+export type FileListParams = Omit<
+  NonNullable<operations["handle_list_files_request"]["parameters"]["query"]>,
+  "order" | "sort_by"
+> & {
+  /** Defaults to `desc`. */
+  order?: "asc" | "desc";
+  /** SDK default is `created_at`. Without it, the API returns files in no guaranteed order. */
+  sort_by?: "created_at" | "filename" | "size";
+};
+export type FileContentParams = NonNullable<
+  operations["handle_download_file_content_request"]["parameters"]["query"]
+>;
+export type FilePublicUrlParams = Schema["CreatePublicUrlRequest"];
+export type FileObject = Schema["File"];
+export type FileObjectList = Schema["ListFilesResponse"];
+export type DeletedFile = Schema["DeleteFileResponse"];
+export type FilePublicUrl = Schema["CreatePublicUrlResponse"];
+export type FilePublicUrlRevocation = Schema["RevokePublicUrlResponse"];
+
+export type BatchCreateParams = {
+  name: string;
+  /** An uploaded JSONL file of requests. File-based batches don't accept more requests. */
+  input_file_id?: string;
+};
+
+export type Batch = {
+  batch_id: string;
+  name: string;
+  create_time: string;
+  expire_time?: string | null;
+  create_api_key_id: string;
+  cancel_time?: string | null;
+  cancel_by_xai_message?: string | null;
+  state: {
+    num_requests: number;
+    num_pending: number;
+    num_success: number;
+    num_error: number;
+    num_cancelled: number;
+  };
+};
+
+export type BatchList = {
+  batches: Batch[];
+  pagination_token?: string | null;
+};
+
+export type BatchWaitOptions = {
+  /** Milliseconds between polls. Defaults to 5000. */
+  interval?: number;
+  /** Maximum total wait in milliseconds. Defaults to 86400000 (24 hours). */
+  timeout?: number;
+  signal?: AbortSignal;
+};
+
+export type BatchRequest = {
+  /** Must be unique within the batch; generated when omitted. Results arrive in any order. */
+  batch_request_id?: string | null;
+  batch_request:
+    | { responses: CreateParams }
+    | { chat_get_completion: Schema["ChatRequest"] }
+    | { image_generation: Schema["GenerateImageRequest"] }
+    | { image_edit: Schema["EditImageRequest"] }
+    | { video_generation: Schema["GenerateVideoRequest"] | Schema["EditVideoRequest"] }
+    | { video_extension: Schema["ExtendVideoRequest"] };
+};
+
+export type BatchRequestMetadata = {
+  batch_request_id: string;
+  endpoint: string;
+  model: string;
+  state: "unknown" | "pending" | "succeeded" | "cancelled" | "failed";
+  create_time: string;
+  finish_time?: string | null;
+};
+
+export type BatchRequestMetadataList = {
+  batch_request_metadata: BatchRequestMetadata[];
+  pagination_token?: string | null;
+};
+
+export type BatchResult = {
+  batch_request_id: string;
+  batch_result:
+    | { error: string }
+    | {
+        response:
+          | "unknown"
+          | { chat_get_completion: Schema["ChatResponse"] }
+          | { image_generation: Schema["GeneratedImageResponse"] }
+          | { video_generation: Schema["VideoResponse"] };
+      };
+};
+
+export type BatchResultList = {
+  results: BatchResult[];
+  pagination_token?: string | null;
+};
+
+export type SpeechParams<T extends string = string> = {
+  /** Up to 60,000 characters. Can include speech tags such as `[pause]`. */
+  text: SpeechText<T>;
+  /** BCP-47 code such as `en` or `pt-BR`, or `auto`. */
+  language: string;
+  /** A built-in voice such as `eve`, or a custom voice ID. Defaults to `eve`. */
+  voice_id?: VoiceId;
+  output_format?: {
+    codec: "mp3" | "wav" | "pcm" | "mulaw" | "alaw";
+    sample_rate?: number | null;
+    /** MP3 only. */
+    bit_rate?: number | null;
+  };
+  optimize_streaming_latency?: 0 | 1 | 2;
+  text_normalization?: boolean;
+  /** Return JSON with base64 audio and per-character timings instead of audio bytes. */
+  with_timestamps?: boolean;
+  speed?: number;
+  replace?: Record<string, string>;
+};
+
+export type SpeechWithTimestamps = {
+  /** Base64-encoded audio in the requested codec. */
+  audio: string;
+  content_type: string;
+  duration: number;
+  audio_timestamps?: {
+    graph_chars: string[];
+    /** Seconds, aligned by index with `graph_chars`. */
+    graph_times: Array<[start: number, end: number]>;
+  };
+};
+
+export type TranscriptionParams = {
+  model?: TranscriptionModelId;
+  /** Only needed for raw `pcm`, `mulaw`, or `alaw` audio, which also needs `sample_rate`. */
+  audio_format?:
+    | "pcm"
+    | "mulaw"
+    | "alaw"
+    | "wav"
+    | "mp3"
+    | "ogg"
+    | "opus"
+    | "flac"
+    | "aac"
+    | "mp4"
+    | "m4a"
+    | "mkv";
+  sample_rate?: 8000 | 16000 | 22050 | 24000 | 44100 | 48000;
+  language?: string;
+  /** Write spoken numbers, currencies, and units in written form. Requires `language`. */
+  format?: boolean;
+  multichannel?: boolean;
+  channels?: number;
+  diarize?: boolean;
+  keyterm?: string[];
+  filler_words?: boolean;
+  vad_threshold?: number;
+} & ({ file: Blob | File; url?: never } | { url: string; file?: never });
+
+type TranscriptionWord = {
+  text: string;
+  start: number;
+  end: number;
+  confidence?: number;
+  speaker?: number;
+};
+
+export type Transcription = {
+  text: string;
+  language: string;
+  duration: number;
+  words?: TranscriptionWord[];
+  /** Present when `multichannel` is true. */
+  channels?: Array<{
+    index: number;
+    language?: string;
+    text: string;
+    words?: TranscriptionWord[];
+  }>;
+};
+
+export type Voice = {
+  voice_id: string;
+  name: string;
+  language?: string | null;
+};
+
+export type VoiceList = { voices: Voice[] };
+
+type CustomVoiceGender = "male" | "female" | "neutral";
+type CustomVoiceAge = "young" | "middle-aged" | "old";
+
+type CustomVoiceLabels = {
+  name?: string;
+  description?: string;
+  gender?: CustomVoiceGender;
+  accent?: string;
+  age?: CustomVoiceAge;
+  language?: string;
+  use_case?:
+    | "conversational"
+    | "narration"
+    | "characters"
+    | "educational"
+    | "advertisement"
+    | "social_media"
+    | "entertainment";
+  tone?: "warm" | "casual" | "professional" | "friendly" | "authoritative" | "expressive" | "calm";
+};
+
+export type CustomVoice = {
+  voice_id: string;
+  name?: string | null;
+  description?: string | null;
+  gender?: CustomVoiceGender | null;
+  accent?: string | null;
+  age?: CustomVoiceAge | null;
+  language?: string | null;
+  use_case?: string | null;
+  tone?: string | null;
+  created_at: string;
+};
+
+export type CustomVoiceList = {
+  voices: CustomVoice[];
+  pagination_token?: string | null;
+};
+
+export type CustomVoiceCreateParams = CustomVoiceLabels & {
+  /** Reference audio of up to 120 seconds. */
+  file: Blob | File;
+};
+
+/** Omitted fields are unchanged; `null` clears a field. */
+export type CustomVoiceUpdateParams = {
+  [K in keyof CustomVoiceLabels]?: CustomVoiceLabels[K] | null;
+};
+
+export type ClientSecretCreateParams = {
+  expires_after?: {
+    /** At most 3600. Defaults to 600. */
+    seconds?: number;
+  };
+  session?: {
+    model?: RealtimeModelId;
+    reasoning?: { effort?: "high" | "none" };
+  } | null;
+};
+
+export type ClientSecret = {
+  value: string;
+  /** Unix time in seconds. */
+  expires_at: number;
+};
+
+export type EmbeddingCreateParams = Omit<
+  Schema["EmbeddingRequest"],
+  "encoding_format" | "input" | "model"
+> & {
+  model: string;
+  /** A string, token IDs, or a batch of up to 128 of either. */
+  input: string | string[] | number[] | number[][];
+  encoding_format?: "float" | "base64" | null;
+};
+
+export type Embedding = Schema["Embedding"];
+export type EmbeddingResponse = Schema["EmbeddingResponse"];
+export type EmbeddingModel = Schema["EmbeddingModel"];
+export type EmbeddingModelList = Schema["ListEmbeddingModelsResponse"];
+
+export type TokenizeParams = Omit<Schema["TokenizeRequest"], "model" | "text"> & {
+  model: ModelId;
+  text: string;
+};
+
+export type Token = Schema["TokenizeResponseToken"];
+export type TokenizeResponse = Schema["TokenizeResponse"];
+
+export type DocumentSearchParams = Schema["SearchRequest"];
+export type DocumentSearchMatch = Schema["SearchMatch"];
+export type DocumentSearchResponse = Schema["SearchResponse"];
 
 export type RequestHook = (request: Request) => void | Promise<void>;
 /** Receives `response.clone()`, which is cancelled after the hook returns. */
@@ -209,6 +590,24 @@ type StreamEvent =
       output_index?: number;
       name?: string;
       arguments: string;
+      sequence_number?: number;
+    }
+  | {
+      type: "response.image_generation_call.in_progress";
+      item_id?: string;
+      output_index?: number;
+      sequence_number?: number;
+    }
+  | {
+      type: "response.image_generation_call.generating";
+      item_id?: string;
+      output_index?: number;
+      sequence_number?: number;
+    }
+  | {
+      type: "response.image_generation_call.completed";
+      item_id?: string;
+      output_index?: number;
       sequence_number?: number;
     };
 

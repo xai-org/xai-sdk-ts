@@ -68,7 +68,7 @@ function redactHeader(key: string, value: string): string {
   return "[REDACTED]";
 }
 
-export function formatCurl(method: string, url: string, headers: Headers, body?: string): string {
+export function formatCurl(method: string, url: string, headers: Headers, body?: string | FormData): string {
   const lines = [`curl -sS -X ${method} '${escapeSingle(redactUrl(url))}'`];
   headers.forEach((value, key) => {
     lines.push(`  -H '${escapeSingle(`${key}: ${redactHeader(key, value)}`)}'`);
@@ -156,14 +156,14 @@ function clientRequestIdFor(client: xAI, opts: RequestOpts | undefined): string 
 function buildHeaders(
   client: xAI,
   opts: RequestOpts | undefined,
-  stream: boolean,
-  hasBody: boolean,
+  accept: string,
+  jsonBody: boolean,
   clientRequestId: string,
 ): Headers {
   const headers = callerHeaders(client, opts);
   if (!headers.has("authorization")) headers.set("authorization", `Bearer ${apiKeyFor(client)}`);
-  if (hasBody && !headers.has("content-type")) headers.set("content-type", "application/json");
-  if (!headers.has("accept")) headers.set("accept", stream ? "text/event-stream" : "application/json");
+  if (jsonBody && !headers.has("content-type")) headers.set("content-type", "application/json");
+  if (!headers.has("accept")) headers.set("accept", accept);
   if (isNode() && !headers.has("user-agent")) headers.set("user-agent", SDK_USER_AGENT);
   headers.set(CLIENT_REQUEST_ID_HEADER, clientRequestId);
   headers.set("xai-sdk-version", `typescript/${SDK_VERSION}`);
@@ -177,6 +177,7 @@ export type InternalRequest = {
   body?: unknown;
   query?: Record<string, string | number | undefined>;
   stream?: boolean;
+  binary?: boolean;
   opts?: RequestOpts;
 };
 
@@ -300,15 +301,17 @@ async function sendWithRetries(
   const maxResponseBodyBytes =
     req.opts?.maxResponseBodyBytes ?? client.maxResponseBodyBytes;
   const hasBody = req.body !== undefined && req.method !== "GET" && req.method !== "HEAD";
-  const jsonBody = hasBody ? JSON.stringify(req.body) : undefined;
+  const body = !hasBody ? undefined : req.body instanceof FormData ? req.body : JSON.stringify(req.body);
   const url = withQuery(joinURL(client.baseURL, req.path), req.query);
   const stream = Boolean(req.stream);
+  const binary = Boolean(req.binary);
+  const accept = stream ? "text/event-stream" : binary ? "*/*" : "application/json";
 
   let attempt = 0;
   let lastRequestId: string | null = null;
 
   while (true) {
-    const headers = buildHeaders(client, req.opts, stream, hasBody, clientRequestId);
+    const headers = buildHeaders(client, req.opts, accept, typeof body === "string", clientRequestId);
     const t = timeoutSignal(timeout);
     const merged = mergeSignals([req.opts?.signal, t.signal]);
     const signal = merged.signal;
@@ -324,12 +327,12 @@ async function sendWithRetries(
     const request = new Request(url, {
       method: req.method,
       headers,
-      body: jsonBody,
+      body,
       signal,
       redirect: "error",
     });
     if (debugEnabled()) {
-      console.error(formatCurl(req.method, url, headers, jsonBody));
+      console.error(formatCurl(req.method, url, headers, body));
     }
 
     let receivedResponse = false;
@@ -378,9 +381,9 @@ async function sendWithRetries(
         clientRequestId,
       };
 
-      if (stream) {
+      if (stream || binary) {
         const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
-        if (contentType !== "text/event-stream") {
+        if (stream && contentType !== "text/event-stream") {
           await response.body?.cancel().catch(() => {});
           cleanupAttempt();
           throw new APIProtocolError("Streaming response must use text/event-stream", {
@@ -389,6 +392,7 @@ async function sendWithRetries(
         }
         if (!response.body) {
           cleanupAttempt();
+          if (binary) return { response, http, payload: undefined, body: null, sawByte: false };
           throw new APIConnectionError("SSE response had no body", { requestId: lastRequestId });
         }
         const peeked = await peekFirstChunk(
