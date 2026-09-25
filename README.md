@@ -526,13 +526,15 @@ const { request_id } = await client.videos.generate({
 });
 ```
 
-Edit a video with `edit()`, or continue it from its last frame with `extend()`. Both return a `request_id` for `wait()`. The source `video` must be an MP4, given as a public URL, a base64 data URL, or a Files API `file_id`. For extensions, `duration` sets the length of the new segment only:
+Edit a video with `edit()`, or continue it from its last frame with `extend()`. Both return a `request_id` for `wait()`. The source `video` must be an MP4, given as a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request. For extensions, `duration` sets the length of the new segment only:
 
 ```ts
+import { openAsBlob } from "node:fs";
+
 const edit = await client.videos.edit({
   model: "grok-imagine-video",
   prompt: "Give the woman a silver necklace",
-  video: { url: "https://example.com/portrait.mp4" },
+  video: await openAsBlob("portrait.mp4"),
 });
 
 const extension = await client.videos.extend({
@@ -542,6 +544,8 @@ const extension = await client.videos.extend({
   duration: 6,
 });
 ```
+
+A `Blob` or `File` without a MIME type is sent as `video/mp4`. Because the video travels inside the request as base64, which is a third larger than the file, upload large videos with `client.files.upload()` (up to 50 MB) and pass `{ file_id }` instead.
 
 List the video generation models available to your API key with `client.videos.models.list()`, or look one up by ID with `client.videos.models.get()`.
 

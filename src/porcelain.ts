@@ -10,6 +10,7 @@ import type {
   OutputItem,
   OutputMessage,
   ReasoningItem,
+  VideoInput,
 } from "./types.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -120,7 +121,11 @@ function sniffImageType(bytes: Uint8Array): string {
   return "application/octet-stream";
 }
 
-async function blobToDataUrl(blob: Blob, signal?: AbortSignal): Promise<string> {
+async function blobToDataUrl(
+  blob: Blob,
+  signal?: AbortSignal,
+  detectType: (bytes: Uint8Array) => string = sniffImageType,
+): Promise<string> {
   assertNotAborted(signal);
   const bytes = new Uint8Array(await abortable(blob.arrayBuffer(), signal));
   assertNotAborted(signal);
@@ -131,7 +136,7 @@ async function blobToDataUrl(blob: Blob, signal?: AbortSignal): Promise<string> 
   }
   const b64 = btoa(binary);
   const mime =
-    blob.type && blob.type !== "application/octet-stream" ? blob.type : sniffImageType(bytes);
+    blob.type && blob.type !== "application/octet-stream" ? blob.type : detectType(bytes);
   return `data:${mime};base64,${b64}`;
 }
 
@@ -174,6 +179,14 @@ export async function inlineImageInput(
   signal?: AbortSignal,
 ): Promise<Exclude<ImageInput, Blob>> {
   return isBlobLike(image) ? { url: await blobToDataUrl(image, signal) } : image;
+}
+
+/** The API accepts only MP4 source videos, so an untyped Blob is sent as `video/mp4`. */
+export async function inlineVideoInput(
+  video: VideoInput,
+  signal?: AbortSignal,
+): Promise<Exclude<VideoInput, Blob>> {
+  return isBlobLike(video) ? { url: await blobToDataUrl(video, signal, () => "video/mp4") } : video;
 }
 
 export type ImageEditWireBody = Omit<ImageEditParams, "image" | "images"> & {

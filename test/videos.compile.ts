@@ -41,6 +41,12 @@ export const generateExamples = [
 export const editExample = {
   model: "grok-imagine-video",
   prompt: "Add snow to the scene",
-  // @ts-expect-error Only image inputs accept Blob or File.
   video: new Blob(["mp4"]),
 } satisfies VideoEditParams;
+
+export const extendExample = {
+  model: "grok-imagine-video",
+  prompt: "The camera pulls back",
+  video: new File(["mp4"], "clip.mp4", { type: "video/mp4" }),
+  duration: 6,
+} satisfies VideoExtendParams;

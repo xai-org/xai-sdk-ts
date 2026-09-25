@@ -112,6 +112,7 @@ export type {
   VideoGenerateParams,
   VideoGenerationModel,
   VideoGenerationModelList,
+  VideoInput,
   VideoResponse,
   VideoStartResponse,
   VideoWaitOptions,

@@ -131,12 +131,17 @@ export type VideoGenerateParams = Omit<
   keyframes?: VideoKeyframe[];
 };
 
-export type VideoEditParams = Omit<Schema["EditVideoRequest"], "model"> & {
+/** Blob and File values are client-only: inlined to a `url` data URL before send. */
+export type VideoInput = Schema["VideoUrl"] | Blob | File;
+
+export type VideoEditParams = Omit<Schema["EditVideoRequest"], "model" | "video"> & {
   model: VideoModelId;
+  video: VideoInput;
 };
 
-export type VideoExtendParams = Omit<Schema["ExtendVideoRequest"], "model"> & {
+export type VideoExtendParams = Omit<Schema["ExtendVideoRequest"], "model" | "video"> & {
   model: VideoModelId;
+  video: VideoInput;
 };
 
 export type VideoStartResponse = Schema["StartDeferredResponse"];

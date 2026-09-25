@@ -183,6 +183,37 @@ describe("videos.edit and videos.extend", () => {
     expect(extended.request_id).toBe("req_2");
     expect(extended.http.requestId).toBe("req_test");
   });
+
+  it("inline Blob and File videos as MP4 data URLs without mutating params", async () => {
+    const { fetch, captured } = mockFetch((_req, n) => jsonResponse({ request_id: `req_${n}` }));
+    const c = client(fetch);
+    const untyped = new Blob(["mp4-bytes"]);
+    const file = new File(["clip-bytes"], "clip.mp4", { type: "video/mp4" });
+    const edit = {
+      model: "grok-imagine-video",
+      prompt: "Add snow to the scene",
+      video: untyped,
+    } satisfies VideoEditParams;
+    const extension = {
+      model: "grok-imagine-video",
+      prompt: "The camera pulls back",
+      video: file,
+      duration: 6,
+    } satisfies VideoExtendParams;
+    await c.videos.edit(edit);
+    await c.videos.extend(extension);
+
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      ...edit,
+      video: { url: `data:video/mp4;base64,${btoa("mp4-bytes")}` },
+    });
+    expect(await jsonBody(captured.requests[1])).toEqual({
+      ...extension,
+      video: { url: `data:video/mp4;base64,${btoa("clip-bytes")}` },
+    });
+    expect(edit.video).toBe(untyped);
+    expect(extension.video).toBe(file);
+  });
 });
 
 describe("videos.get", () => {

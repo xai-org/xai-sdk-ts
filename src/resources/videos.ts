@@ -1,6 +1,6 @@
 import { combineSignals, send, sleep, type SendResult } from "../http.js";
 import { APIProtocolError, TimeoutError, requestIds } from "../errors.js";
-import { inlineImageInput } from "../porcelain.js";
+import { inlineImageInput, inlineVideoInput } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
 import { requireRecord } from "./shared.js";
 import type { components } from "../generated/types.js";
@@ -85,7 +85,7 @@ export class Videos {
     const result = await send(this.client, {
       method: "POST",
       path: "/videos/edits",
-      body,
+      body: { ...body, video: await inlineVideoInput(body.video, opts?.signal) },
       opts,
     });
     return toStartResponse(result);
@@ -98,7 +98,7 @@ export class Videos {
     const result = await send(this.client, {
       method: "POST",
       path: "/videos/extensions",
-      body,
+      body: { ...body, video: await inlineVideoInput(body.video, opts?.signal) },
       opts,
     });
     return toStartResponse(result);
