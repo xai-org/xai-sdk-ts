@@ -185,16 +185,16 @@ describe("voice.transcribe", () => {
   });
 });
 
-describe("voice.voices", () => {
+describe("voice.list and voice.get", () => {
   it("lists and gets built-in voices", async () => {
     const eve = { voice_id: "eve", name: "Eve", language: "en" };
     const { fetch, captured } = mockFetch((req) =>
       req.url.endsWith("/tts/voices") ? jsonResponse({ voices: [eve] }) : jsonResponse(eve),
     );
     const c = client(fetch);
-    const list = await c.voice.voices.list();
-    const voice = await c.voice.voices.get("eve");
-    await c.voice.voices.get("custom/id");
+    const list = await c.voice.list();
+    const voice = await c.voice.get("eve");
+    await c.voice.get("custom/id");
 
     expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       "GET https://api.x.ai/v1/tts/voices",
@@ -208,12 +208,12 @@ describe("voice.voices", () => {
 
   it("rejects malformed voice bodies", async () => {
     const missingVoices = mockFetch(() => jsonResponse({ data: [] }));
-    await expect(client(missingVoices.fetch).voice.voices.list()).rejects.toBeInstanceOf(
+    await expect(client(missingVoices.fetch).voice.list()).rejects.toBeInstanceOf(
       APIProtocolError,
     );
 
     const missingId = mockFetch(() => jsonResponse({ name: "Eve" }));
-    await expect(client(missingId.fetch).voice.voices.get("eve")).rejects.toBeInstanceOf(
+    await expect(client(missingId.fetch).voice.get("eve")).rejects.toBeInstanceOf(
       APIProtocolError,
     );
   });

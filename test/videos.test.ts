@@ -374,7 +374,7 @@ describe("videos.wait", () => {
   });
 });
 
-describe("videos.models", () => {
+describe("models.video", () => {
   it("lists and gets video generation models", async () => {
     const { fetch, captured } = mockFetch((req) =>
       req.url.endsWith("/video-generation-models")
@@ -382,9 +382,9 @@ describe("videos.models", () => {
         : jsonResponse(videoModel),
     );
     const c = client(fetch);
-    const list = await c.videos.models.list();
-    const got = await c.videos.models.get(model);
-    await c.videos.models.get("custom/alias");
+    const list = await c.models.video.list();
+    const got = await c.models.video.get(model);
+    await c.models.video.get("custom/alias");
 
     expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       "GET https://api.x.ai/v1/video-generation-models",
@@ -399,17 +399,17 @@ describe("videos.models", () => {
 
   it("rejects malformed model bodies", async () => {
     const wrongShape = mockFetch(() => jsonResponse({ object: "list", data: [videoModel] }));
-    await expect(client(wrongShape.fetch).videos.models.list()).rejects.toBeInstanceOf(
+    await expect(client(wrongShape.fetch).models.video.list()).rejects.toBeInstanceOf(
       APIProtocolError,
     );
 
     const missingIds = mockFetch(() => jsonResponse({ models: [{ object: "model" }] }));
-    await expect(client(missingIds.fetch).videos.models.list()).rejects.toBeInstanceOf(
+    await expect(client(missingIds.fetch).models.video.list()).rejects.toBeInstanceOf(
       APIProtocolError,
     );
 
     const missingId = mockFetch(() => jsonResponse({ object: "model" }));
-    await expect(client(missingId.fetch).videos.models.get(model)).rejects.toBeInstanceOf(
+    await expect(client(missingId.fetch).models.video.get(model)).rejects.toBeInstanceOf(
       APIProtocolError,
     );
   });

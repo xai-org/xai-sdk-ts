@@ -46,13 +46,10 @@ function toCustomVoice(result: SendResult): CustomVoice & { http: HttpMeta } {
 }
 
 export class VoiceResource {
-  /** Built-in voices. Custom voices are managed by `custom`. */
-  readonly voices: Voices;
   readonly custom: CustomVoices;
   readonly clientSecrets: ClientSecrets;
 
   constructor(private readonly client: xAI) {
-    this.voices = new Voices(client);
     this.custom = new CustomVoices(client);
     this.clientSecrets = new ClientSecrets(client);
   }
@@ -103,11 +100,8 @@ export class VoiceResource {
     }
     return { ...(transcription as Transcription), http: result.http };
   }
-}
 
-export class Voices {
-  constructor(private readonly client: xAI) {}
-
+  /** Built-in voices. Custom voices are listed by `custom.list()`. */
   async list(opts?: RequestOpts): Promise<VoiceList & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",

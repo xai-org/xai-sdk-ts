@@ -248,7 +248,7 @@ describe("image response validation", () => {
   });
 });
 
-describe("images.models", () => {
+describe("models.image", () => {
   it("lists and gets image generation models", async () => {
     const { fetch, captured } = mockFetch((req) =>
       req.url.endsWith("/image-generation-models")
@@ -256,9 +256,9 @@ describe("images.models", () => {
         : jsonResponse(imageModel),
     );
     const c = client(fetch);
-    const list = await c.images.models.list();
-    const got = await c.images.models.get(model);
-    await c.images.models.get("custom/alias");
+    const list = await c.models.image.list();
+    const got = await c.models.image.get(model);
+    await c.models.image.get("custom/alias");
 
     expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       "GET https://api.x.ai/v1/image-generation-models",
@@ -273,17 +273,17 @@ describe("images.models", () => {
 
   it("rejects malformed model bodies", async () => {
     const wrongShape = mockFetch(() => jsonResponse({ object: "list", data: [imageModel] }));
-    await expect(client(wrongShape.fetch).images.models.list()).rejects.toBeInstanceOf(
+    await expect(client(wrongShape.fetch).models.image.list()).rejects.toBeInstanceOf(
       APIProtocolError,
     );
 
     const missingIds = mockFetch(() => jsonResponse({ models: [{ object: "model" }] }));
-    await expect(client(missingIds.fetch).images.models.list()).rejects.toBeInstanceOf(
+    await expect(client(missingIds.fetch).models.image.list()).rejects.toBeInstanceOf(
       APIProtocolError,
     );
 
     const missingId = mockFetch(() => jsonResponse({ object: "model" }));
-    await expect(client(missingId.fetch).images.models.get(model)).rejects.toBeInstanceOf(
+    await expect(client(missingId.fetch).models.image.get(model)).rejects.toBeInstanceOf(
       APIProtocolError,
     );
   });

@@ -3,16 +3,7 @@ import { APIProtocolError, requestIds } from "../errors.js";
 import { inlineImageInputs } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
 import { requireRecord } from "./shared.js";
-import type {
-  HttpMeta,
-  ImageEditParams,
-  ImageGenerateParams,
-  ImageGenerationModel,
-  ImageGenerationModelList,
-  ImageResponse,
-  RequestOpts,
-} from "../types.js";
-import type { ImageModelId } from "../models.js";
+import type { ImageEditParams, ImageGenerateParams, ImageResponse, RequestOpts } from "../types.js";
 import type { xAI } from "../client.js";
 
 function toImageResponse(result: SendResult): ImageResponse {
@@ -31,11 +22,7 @@ function toImageResponse(result: SendResult): ImageResponse {
 }
 
 export class Images {
-  readonly models: ImageModels;
-
-  constructor(private readonly client: xAI) {
-    this.models = new ImageModels(client);
-  }
+  constructor(private readonly client: xAI) {}
 
   async generate(body: ImageGenerateParams, opts?: RequestOpts): Promise<ImageResponse> {
     const result = await send(this.client, {
@@ -56,52 +43,5 @@ export class Images {
       opts,
     });
     return toImageResponse(result);
-  }
-}
-
-export class ImageModels {
-  constructor(private readonly client: xAI) {}
-
-  async list(opts?: RequestOpts): Promise<ImageGenerationModelList & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: "/image-generation-models",
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Image model list");
-    if (
-      !Array.isArray(body.models) ||
-      !body.models.every(
-        (model) =>
-          typeof model === "object" &&
-          model !== null &&
-          typeof (model as { id?: unknown }).id === "string",
-      )
-    ) {
-      throw new APIProtocolError("Image model list is missing models", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as ImageGenerationModelList), http: result.http };
-  }
-
-  async get(
-    id: ImageModelId,
-    opts?: RequestOpts,
-  ): Promise<ImageGenerationModel & { http: HttpMeta }> {
-    const result = await send(this.client, {
-      method: "GET",
-      path: `/image-generation-models/${encodeURIComponent(id)}`,
-      opts,
-    });
-    const body = requireRecord(result.payload, result.http, "Image model");
-    if (typeof body.id !== "string" || body.id.length === 0) {
-      throw new APIProtocolError("Image model response is missing id", {
-        ...requestIds(result.http),
-        body,
-      });
-    }
-    return { ...(body as ImageGenerationModel), http: result.http };
   }
 }

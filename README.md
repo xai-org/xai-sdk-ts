@@ -547,7 +547,7 @@ const extension = await client.videos.extend({
 
 A `Blob` or `File` without a MIME type is sent as `video/mp4`. Because the video travels inside the request as base64, which is a third larger than the file, upload large videos with `client.files.upload()` (up to 50 MB) and pass `{ file_id }` instead.
 
-List the video generation models available to your API key with `client.videos.models.list()`, or look one up by ID with `client.videos.models.get()`.
+List the video generation models available to your API key with `client.models.video.list()`, or look one up by ID with `client.models.video.get()`.
 
 ## Files
 
@@ -668,7 +668,7 @@ await writeFile("welcome.mp3", await speech.bytes());
 
 Shape the delivery with [speech tags](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech#speech-tags) in the text. Inline tags such as `[pause]`, `[long-pause]`, and `[laugh]` go where the sound should happen, and wrapping tags such as `<whisper>It's a secret.</whisper>` change how the enclosed text is spoken. The API doesn't report mistakes in tags, so TypeScript checks string literals as you type: it flags unknown tags such as `[laff]` and suggests the closest one, and it catches wrapping tags that are never closed, closed without being opened, or closed in the wrong order. To use a tag released after this SDK version, add `as string` to the text.
 
-`voice_id` autocompletes the built-in voices and accepts any other string, such as a custom voice ID or a voice added after this SDK version. List the built-in voices with `client.voice.voices.list()`. To start playback before synthesis finishes, read `speech.body` as a stream. Set `with_timestamps: true` to receive JSON with base64 `audio` and per-character `audio_timestamps` instead of audio bytes.
+`voice_id` autocompletes the built-in voices and accepts any other string, such as a custom voice ID or a voice added after this SDK version. List the built-in voices with `client.voice.list()`. To start playback before synthesis finishes, read `speech.body` as a stream. Set `with_timestamps: true` to receive JSON with base64 `audio` and per-character `audio_timestamps` instead of audio bytes.
 
 Transcribe a recording with `client.voice.transcribe()`. Pass the audio as a `Blob` or `File`, or pass `url` to have the API download it:
 
@@ -765,12 +765,12 @@ import { type KnownImageModelId } from "@xai-official/sdk";
 
 const imageModel = "grok-imagine-image-2.0" satisfies KnownImageModelId;
 
-const imageModels = await client.images.models.list();
+const imageModels = await client.models.image.list();
 for (const availableImageModel of imageModels.models) {
   console.log(availableImageModel.id, availableImageModel.aliases);
 }
 
-const imageModelInfo = await client.images.models.get(imageModel);
+const imageModelInfo = await client.models.image.get(imageModel);
 console.log(imageModelInfo);
 ```
 
