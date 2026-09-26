@@ -1,3 +1,4 @@
+import type { ServerToolCallType } from "./constants.js";
 import type { components, operations } from "./generated/types.js";
 import type { RealtimeModelId, TranscriptionModelId, VoiceId } from "./generated/voice.js";
 import type { ImageModelId, ModelId, VideoModelId } from "./models.js";
@@ -21,6 +22,9 @@ export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
   type: "reasoning";
 };
 export type ImageGenerationCall = Schema["ImageGenerationCall"];
+/** A tool call that xAI runs itself, such as web search, X search, code execution, or image generation. */
+export type ServerToolCall = OutputItem & { type: ServerToolCallType };
+export type UrlCitation = Omit<Schema["Annotation"], "type"> & { type: "url_citation" };
 export type IncompleteDetails = Schema["IncompleteDetails"];
 export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
 export type InputItemList = Schema["ListInputItemsResponse"];

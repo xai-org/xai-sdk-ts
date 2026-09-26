@@ -1,4 +1,4 @@
-import { isKnownStreamEventType, MAX_STREAM_INDEX } from "./constants.js";
+import { isKnownStreamEventType, isServerToolCallType, MAX_STREAM_INDEX } from "./constants.js";
 import {
   AbortError,
   APIError,
@@ -9,14 +9,72 @@ import {
   withClientRequestId,
 } from "./errors.js";
 import { parseSse } from "./sse.js";
-import { parseJsonOutput, toInput, toText } from "./porcelain.js";
+import {
+  isFunctionCall,
+  isImageGenerationCall,
+  isMessage,
+  parseJsonOutput,
+  toInput,
+  toText,
+} from "./porcelain.js";
 import { xAIResponse } from "./response.js";
 import { emptyUsage, mapUsage, type Usage } from "./usage.js";
-import type { HttpMeta, IncompleteDetails, InputItem, OutputItem, xAIStreamEvent } from "./types.js";
+import type {
+  FunctionToolCall,
+  HttpMeta,
+  ImageGenerationCall,
+  IncompleteDetails,
+  InputItem,
+  OutputItem,
+  OutputMessage,
+  ServerToolCall,
+  UrlCitation,
+  xAIStreamEvent,
+} from "./types.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
+
+function isServerToolCall(item: unknown): item is ServerToolCall {
+  return isRecord(item) && isServerToolCallType(item.type);
+}
+
+function urlCitations(message: OutputMessage): UrlCitation[] {
+  const citations: UrlCitation[] = [];
+  if (!Array.isArray(message.content)) return citations;
+  for (const part of message.content) {
+    if (!isRecord(part) || part.type !== "output_text" || !Array.isArray(part.annotations)) continue;
+    for (const annotation of part.annotations) {
+      if (isRecord(annotation) && annotation.type === "url_citation" && typeof annotation.url === "string") {
+        citations.push(annotation as UrlCitation);
+      }
+    }
+  }
+  return citations;
+}
+
+type HelperListeners = {
+  text: (text: string) => void;
+  reasoning: (text: string) => void;
+  tool_call: (call: FunctionToolCall) => void;
+  server_tool_call: (call: ServerToolCall) => void;
+  image: (image: ImageGenerationCall) => void;
+  citation: (citation: UrlCitation) => void;
+};
+
+type StreamListeners = HelperListeners & {
+  [T in xAIStreamEvent["type"]]: (event: Extract<xAIStreamEvent, { type: T }>) => void;
+};
+
+const HELPER_EVENTS: Record<keyof HelperListeners, true> = {
+  text: true,
+  reasoning: true,
+  tool_call: true,
+  server_tool_call: true,
+  image: true,
+  citation: true,
+};
 
 export class xAIStream implements AsyncIterable<xAIStreamEvent> {
   id = "";
@@ -34,7 +92,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
   #closeController = new AbortController();
   #requestId: string | null;
   #signal: AbortSignal | undefined;
-  #textListeners: ((text: string) => void)[] = [];
+  #listeners = new Map<string, ((value: never) => void)[]>();
   #final: Record<string, unknown> | undefined;
   #ended = Promise.withResolvers<void>();
   #done: Promise<xAIResponse> | undefined;
@@ -68,10 +126,17 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     return parseJsonOutput(this.output, this.status, true);
   }
 
-  /** Calls `listener` with each chunk of answer text, whether a loop or `done()` reads the stream. */
-  on(event: "text", listener: (text: string) => void): this {
-    if (event !== "text") throw new TypeError(`Unsupported stream event: ${String(event)}`);
-    this.#textListeners.push(listener);
+  /**
+   * Calls `listener` for each event of the given type, or for a helper event such as `"text"` or `"tool_call"`,
+   * whether a loop or `done()` reads the stream.
+   */
+  on<K extends keyof StreamListeners>(event: K, listener: StreamListeners[K]): this {
+    if (!Object.hasOwn(HELPER_EVENTS, event) && event !== "unknown" && !isKnownStreamEventType(event)) {
+      throw new TypeError(`Unsupported stream event: ${String(event)}`);
+    }
+    const listeners = this.#listeners.get(event) ?? [];
+    listeners.push(listener);
+    this.#listeners.set(event, listeners);
     return this;
   }
 
@@ -107,9 +172,8 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     this.#consumed = true;
     try {
       for await (const event of this.#events()) {
-        if (event.type === "response.output_text.delta") {
-          for (const listener of this.#textListeners) listener(event.delta);
-        }
+        this.#emit(event.type, event);
+        this.#emitHelpers(event);
         yield event;
       }
     } catch (err) {
@@ -120,10 +184,39 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     }
   }
 
+  #emit(name: keyof StreamListeners, value: unknown): void {
+    for (const listener of this.#listeners.get(name) ?? []) listener(value as never);
+  }
+
+  #emitHelpers(event: xAIStreamEvent): void {
+    switch (event.type) {
+      case "response.output_text.delta":
+        this.#emit("text", event.delta);
+        break;
+      case "response.reasoning_text.delta":
+      case "response.reasoning_summary_text.delta":
+        this.#emit("reasoning", event.delta);
+        break;
+      case "response.output_item.added":
+        if (isServerToolCall(event.item)) this.#emit("server_tool_call", event.item);
+        break;
+      case "response.output_item.done":
+        if (isFunctionCall(event.item)) this.#emit("tool_call", event.item);
+        if (isServerToolCall(event.item)) this.#emit("server_tool_call", event.item);
+        if (isImageGenerationCall(event.item)) this.#emit("image", event.item);
+        if (isMessage(event.item)) {
+          for (const citation of urlCitations(event.item)) this.#emit("citation", citation);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   async #drain(): Promise<void> {
     try {
       for await (const _ of this) {
-        // text listeners run inside the iterator
+        // listeners run inside the iterator
       }
     } catch {
       // done() reports the error

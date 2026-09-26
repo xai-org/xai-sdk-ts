@@ -50,10 +50,21 @@ export type StreamDoneResolvesToResponse = Assert<
   Equals<Awaited<ReturnType<xAIStream["done"]>>, xAIResponse>
 >;
 
-export function listenForText(stream: xAIStream): xAIStream {
-  // @ts-expect-error only text events are supported
-  stream.on("reasoning", () => {});
-  return stream.on("text", (text: string) => text.length);
+export function listenForEvents(stream: xAIStream): xAIStream {
+  // @ts-expect-error unknown event names are rejected
+  stream.on("tool_calls", () => {});
+  // @ts-expect-error event listeners receive the event, not its text
+  stream.on("response.output_text.delta", (text: string) => text);
+  return stream
+    .on("text", (text: string) => text.length)
+    .on("reasoning", (text: string) => text.length)
+    .on("tool_call", (call) => JSON.parse(call.arguments) as unknown)
+    .on("server_tool_call", (call) => `${call.type}: ${String(call.status)}`)
+    .on("image", (image) => image.result)
+    .on("citation", (citation) => citation.url.length)
+    .on("response.function_call_arguments.delta", (event) => event.delta.length)
+    .on("response.completed", (event) => event.response.id)
+    .on("error", (event) => event.error?.status);
 }
 
 export const requestExamples = [

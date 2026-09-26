@@ -86,7 +86,26 @@ console.log(`\n${response.usage.total_tokens} tokens`);
 
 `done()` resolves to the same response object a non-streamed request returns. It rejects if the stream fails or closes before the response completes.
 
-To handle every server-sent event, such as reasoning or function-call argument deltas, iterate over the stream instead. The stream accumulates the final response as events arrive:
+Besides `"text"`, `on()` has helper events for the rest of a response:
+
+- `"reasoning"` for each chunk of reasoning text or reasoning summary
+- `"tool_call"` for each finished call to one of your function tools
+- `"server_tool_call"` for each call to a tool that xAI runs, such as web search or code execution, once when it starts and again when it finishes
+- `"image"` for each finished image generation call, with the base64 image in `result`
+- `"citation"` for each URL citation in the answer
+
+```ts
+const response = await stream
+  .on("reasoning", (text) => process.stderr.write(text))
+  .on("text", (text) => process.stdout.write(text))
+  .on("server_tool_call", (call) => console.error(`\n${call.type} ${call.status}`))
+  .on("tool_call", (call) => console.error(`\n${call.name}(${call.arguments})`))
+  .done();
+```
+
+`on()` also takes any server-sent event type, such as `"response.completed"`, and passes the listener the typed event. Events the SDK doesn't recognize arrive as `"unknown"`, with the original payload in `event.raw`.
+
+You can also iterate over the stream to handle events in a loop. The stream accumulates the final response as events arrive:
 
 ```ts
 for await (const event of stream) {
@@ -326,6 +345,60 @@ console.log(answer.toText());
 ```
 
 Treat function names and arguments as untrusted input. Only dispatch functions you have explicitly allowed, and validate arguments before executing them.
+
+### Tool call loop
+
+To let the model call tools until it has an answer, run a loop. Stream a turn, run each function call as soon as it finishes streaming, then send the outputs back along with the model's output. Stop when a turn makes no function calls, and cap the number of turns so a model that keeps calling tools can't loop forever. This reuses `getWeatherTool` and `getWeather` from the example above:
+
+```ts
+import { type FunctionToolCall, type InputItem, type Tool, xAI } from "@xai-official/sdk";
+
+const client = new xAI();
+const tools: Tool[] = [getWeatherTool];
+const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
+  get_weather: (args) => getWeather((args as { location: string }).location),
+};
+
+async function runTool(call: FunctionToolCall): Promise<InputItem> {
+  let output: unknown;
+  try {
+    const handler = handlers[call.name];
+    if (!handler) throw new Error(`Unknown tool: ${call.name}`);
+    output = await handler(JSON.parse(call.arguments));
+  } catch (err) {
+    output = { error: err instanceof Error ? err.message : String(err) };
+  }
+  return {
+    type: "function_call_output",
+    call_id: call.call_id,
+    output: JSON.stringify(output),
+  };
+}
+
+const input: InputItem[] = [
+  { role: "user", content: "Compare the weather in Paris and Tokyo." },
+];
+
+for (let turn = 0; turn < 10; turn++) {
+  const toolRuns: Promise<InputItem>[] = [];
+  const stream = await client.responses.create({
+    model: "grok-4.6",
+    input,
+    tools,
+    stream: true,
+  });
+  const response = await stream
+    .on("text", (text) => process.stdout.write(text))
+    .on("tool_call", (call) => toolRuns.push(runTool(call)))
+    .done();
+  if (toolRuns.length === 0) break;
+
+  const toolOutputs = await Promise.all(toolRuns);
+  input.push(...response.toInput(), ...toolOutputs);
+}
+```
+
+The `handlers` map is the list of functions the model may call. `runTool()` returns errors to the model instead of throwing, so the model can recover, and a failing tool can't crash the loop while the stream is still running.
 
 ## Server-side search
 

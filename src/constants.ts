@@ -49,6 +49,25 @@ export function isKnownStreamEventType(type: string): type is KnownStreamEventTy
   return KNOWN_SET.has(type);
 }
 
+/** Output item types for tools that xAI runs itself. */
+export const SERVER_TOOL_CALL_TYPES = [
+  "web_search_call",
+  "x_search_call",
+  "file_search_call",
+  "code_interpreter_call",
+  "mcp_call",
+  "tool_search_call",
+  "image_generation_call",
+] as const;
+
+export type ServerToolCallType = (typeof SERVER_TOOL_CALL_TYPES)[number];
+
+const SERVER_TOOL_CALL_SET = new Set<string>(SERVER_TOOL_CALL_TYPES);
+
+export function isServerToolCallType(type: unknown): type is ServerToolCallType {
+  return typeof type === "string" && SERVER_TOOL_CALL_SET.has(type);
+}
+
 /** Safe to retry even for create requests: the server rejected work before generation. */
 export const RETRYABLE_STATUS = new Set([429]);
 

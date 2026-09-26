@@ -280,6 +280,94 @@ describe("stream.on and stream.done", () => {
     expect(stream.done()).toBe(stream.done());
   });
 
+  it("sends each event type to its listeners", async () => {
+    const stream = await streamOf([
+      ...events.slice(0, 3),
+      { type: "response.brand_new_event", foo: 1 },
+      { type: "response.completed", response: completedResponse },
+    ]);
+    const seen: string[] = [];
+    await stream
+      .on("text", (text) => seen.push(`text:${text}`))
+      .on("response.output_text.delta", (event) => seen.push(`delta:${event.delta}`))
+      .on("unknown", (event) => seen.push(`unknown:${(event.raw as { type: string }).type}`))
+      .on("response.completed", (event) => seen.push(`completed:${event.response.id}`))
+      .done();
+    expect(seen).toEqual([
+      "delta:Hello",
+      "text:Hello",
+      "unknown:response.brand_new_event",
+      "completed:resp_123",
+    ]);
+  });
+
+  it("sends reasoning, tool calls, server tool calls, images, and citations to helper listeners", async () => {
+    const functionCall = {
+      type: "function_call",
+      name: "get_weather",
+      call_id: "call_1",
+      arguments: '{"city":"Paris"}',
+      status: "completed",
+    };
+    const webSearch = { type: "web_search_call", id: "ws_1", action: { type: "search", query: "paris" } };
+    const xSearch = {
+      type: "x_search_call",
+      name: "x_keyword_search",
+      call_id: "xs_1",
+      arguments: '{"query":"paris"}',
+      status: "completed",
+    };
+    const image = { type: "image_generation_call", id: "ig_1", status: "completed", result: "aW1hZ2U=" };
+    const message = {
+      type: "message",
+      role: "assistant",
+      status: "completed",
+      content: [
+        {
+          type: "output_text",
+          text: "Sunny",
+          annotations: [
+            { type: "url_citation", url: "https://example.com", title: "Example", start_index: 0, end_index: 5 },
+            { type: "file_citation", file_id: "file_1" },
+          ],
+        },
+        { type: "refusal", refusal: "No" },
+      ],
+    };
+    const stream = await streamOf([
+      { type: "response.reasoning_summary_text.delta", output_index: 0, delta: "Checking" },
+      { type: "response.reasoning_text.delta", output_index: 0, delta: " the weather" },
+      { type: "response.output_item.added", output_index: 1, item: { ...webSearch, status: "in_progress" } },
+      { type: "response.output_item.done", output_index: 1, item: { ...webSearch, status: "completed" } },
+      { type: "response.output_item.done", output_index: 2, item: xSearch },
+      { type: "response.output_item.added", output_index: 3, item: { ...functionCall, arguments: "", status: "in_progress" } },
+      { type: "response.output_item.done", output_index: 3, item: functionCall },
+      { type: "response.output_item.done", output_index: 4, item: image },
+      { type: "response.output_item.done", output_index: 5, item: message },
+      { type: "response.output_item.done", output_index: 6, item: { type: "message", role: "assistant" } },
+      { type: "response.completed", response: completedResponse },
+    ]);
+    const seen: string[] = [];
+    await stream
+      .on("reasoning", (text) => seen.push(`reasoning:${text}`))
+      .on("server_tool_call", (call) => seen.push(`server:${call.type}:${String(call.status)}`))
+      .on("tool_call", (call) => seen.push(`tool:${call.name}:${call.arguments}`))
+      .on("image", (item) => seen.push(`image:${String(item.result)}`))
+      .on("citation", (citation) => seen.push(`citation:${citation.url}`))
+      .done();
+    expect(seen).toEqual([
+      "reasoning:Checking",
+      "reasoning: the weather",
+      "server:web_search_call:in_progress",
+      "server:web_search_call:completed",
+      "server:x_search_call:completed",
+      'tool:get_weather:{"city":"Paris"}',
+      "server:image_generation_call:completed",
+      "image:aW1hZ2U=",
+      "citation:https://example.com",
+    ]);
+  });
+
   it("waits for a loop that is already reading the stream", async () => {
     const stream = await streamOf(events);
     const texts: string[] = [];
@@ -341,7 +429,7 @@ describe("stream.on and stream.done", () => {
 
   it("rejects unsupported event names", async () => {
     const stream = await streamOf(events);
-    expect(() => stream.on("reasoning" as "text", () => {})).toThrow(TypeError);
+    expect(() => stream.on("tool_calls" as "tool_call", () => {})).toThrow(TypeError);
     await stream.close();
   });
 });
