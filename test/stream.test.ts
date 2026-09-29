@@ -301,7 +301,7 @@ describe("stream.on and stream.done", () => {
     ]);
   });
 
-  it("sends reasoning, tool calls, server tool calls, images, and citations to helper listeners", async () => {
+  it("sends reasoning, tool calls, images, and citations to helper listeners", async () => {
     const functionCall = {
       type: "function_call",
       name: "get_weather",
@@ -317,6 +317,15 @@ describe("stream.on and stream.done", () => {
       arguments: '{"query":"paris"}',
       status: "completed",
     };
+    const customXSearch = {
+      type: "custom_tool_call",
+      id: "ctc_1",
+      call_id: "xs_call-1",
+      name: "x_semantic_search",
+      input: '{"query":"paris"}',
+      status: "completed",
+    };
+    const shell = { type: "shell_call", id: "sh_1", call_id: "call_2", action: { commands: ["ls"] }, status: "completed" };
     const image = { type: "image_generation_call", id: "ig_1", status: "completed", result: "aW1hZ2U=" };
     const message = {
       type: "message",
@@ -340,28 +349,48 @@ describe("stream.on and stream.done", () => {
       { type: "response.output_item.added", output_index: 1, item: { ...webSearch, status: "in_progress" } },
       { type: "response.output_item.done", output_index: 1, item: { ...webSearch, status: "completed" } },
       { type: "response.output_item.done", output_index: 2, item: xSearch },
-      { type: "response.output_item.added", output_index: 3, item: { ...functionCall, arguments: "", status: "in_progress" } },
-      { type: "response.output_item.done", output_index: 3, item: functionCall },
-      { type: "response.output_item.done", output_index: 4, item: image },
-      { type: "response.output_item.done", output_index: 5, item: message },
-      { type: "response.output_item.done", output_index: 6, item: { type: "message", role: "assistant" } },
+      { type: "response.output_item.added", output_index: 3, item: { ...customXSearch, input: "", status: "in_progress" } },
+      { type: "response.output_item.done", output_index: 3, item: customXSearch },
+      { type: "response.output_item.added", output_index: 4, item: { ...functionCall, arguments: "", status: "in_progress" } },
+      { type: "response.output_item.done", output_index: 4, item: functionCall },
+      { type: "response.output_item.added", output_index: 5, item: { ...shell, status: "in_progress" } },
+      { type: "response.output_item.done", output_index: 5, item: shell },
+      { type: "response.output_item.done", output_index: 6, item: image },
+      { type: "response.output_item.done", output_index: 7, item: message },
+      { type: "response.output_item.done", output_index: 8, item: { type: "message", role: "assistant" } },
       { type: "response.completed", response: completedResponse },
     ]);
     const seen: Array<string> = [];
     await stream
       .on("reasoning", (text) => seen.push(`reasoning:${text}`))
-      .on("server_tool_call", (call) => seen.push(`server:${call.type}:${String(call.status)}`))
-      .on("tool_call", (call) => seen.push(`tool:${call.name}:${call.arguments}`))
+      .on("tool_call", (call) => seen.push(`all:${call.type === "function_call" ? call.name : call.type}`))
+      .on("server_tool_call", (call) =>
+        seen.push(
+          call.type === "custom_tool_call"
+            ? `server:${call.name}:${String(call.input)}`
+            : `server:${call.type}:${String(call.status)}`,
+        ),
+      )
+      .on("client_tool_call", (call) =>
+        seen.push(call.type === "function_call" ? `client:${call.name}:${call.arguments}` : `client:${call.type}`),
+      )
       .on("image", (item) => seen.push(`image:${String(item.result)}`))
       .on("citation", (citation) => seen.push(`citation:${citation.url}`))
       .done();
     expect(seen).toEqual([
       "reasoning:Checking",
       "reasoning: the weather",
-      "server:web_search_call:in_progress",
+      "all:web_search_call",
       "server:web_search_call:completed",
+      "all:x_search_call",
       "server:x_search_call:completed",
-      'tool:get_weather:{"city":"Paris"}',
+      "all:custom_tool_call",
+      'server:x_semantic_search:{"query":"paris"}',
+      "all:get_weather",
+      'client:get_weather:{"city":"Paris"}',
+      "all:shell_call",
+      "client:shell_call",
+      "all:image_generation_call",
       "server:image_generation_call:completed",
       "image:aW1hZ2U=",
       "citation:https://example.com",

@@ -87,17 +87,19 @@ console.log(`\n${response.usage.total_tokens} tokens`);
 Besides `"text"`, `on()` has helper events for the rest of a response:
 
 - `"reasoning"` for each chunk of reasoning text or reasoning summary
-- `"tool_call"` for each finished call to one of your function tools
-- `"server_tool_call"` for each call to a tool that xAI runs, such as web search or code execution, once when it starts and again when it finishes
+- `"tool_call"` for each tool call once its arguments are complete, whether your code or xAI runs it. Check `call.type` to tell them apart
+- `"client_tool_call"` for each call that your code runs: your function tools and shell commands
+- `"server_tool_call"` for each call to a tool that xAI runs, such as web search or code execution
 - `"image"` for each finished image generation call, with the base64 image in `result`
 - `"citation"` for each URL citation in the answer
+
+Each tool call fires once, when its arguments are complete. For your function tools, that's when to run the function, since nothing has run it yet. To show that a call has started before its arguments arrive, listen for `"response.output_item.added"`.
 
 ```ts
 const response = await stream
   .on("reasoning", (text) => process.stderr.write(text))
   .on("text", (text) => process.stdout.write(text))
-  .on("server_tool_call", (call) => console.error(`\n${call.type} ${call.status}`))
-  .on("tool_call", (call) => console.error(`\n${call.name}(${call.arguments})`))
+  .on("tool_call", (call) => console.error(`\n${call.type} ${call.status}`))
   .done();
 ```
 
@@ -323,27 +325,22 @@ const response = await client.responses.create({
 });
 
 const call = response.output.find(isFunctionCall);
-if (!call) {
-  throw new Error("The model did not request a function");
-}
-
-const weather = await getWeather(JSON.parse(call.arguments));
+if (!call) throw new Error("The model did not call get_weather");
+const result = await getWeather(JSON.parse(call.arguments));
 
 const answer = await client.responses.create({
   model: "grok-4.7",
   input: [
     ...input,
     ...response.toInput(),
-    {
-      type: "function_call_output",
-      call_id: call.call_id,
-      output: JSON.stringify(weather),
-    },
+    { type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) },
   ],
 });
 
 console.log(answer.toText());
 ```
+
+`parallel_tool_calls: false` limits the model to one function call per turn, so this example only has to handle one. By default the model can ask for several at once, which the [tool call loop](#tool-call-loop) handles.
 
 Treat function names and arguments as untrusted input. Only dispatch functions you have explicitly allowed, and validate arguments before executing them, as `getWeather()` does.
 
@@ -390,7 +387,9 @@ for (let turn = 0; turn < 10; turn++) {
   });
   const response = await stream
     .on("text", (text) => process.stdout.write(text))
-    .on("tool_call", (call) => toolRuns.push(runTool(call)))
+    .on("client_tool_call", (call) => {
+      if (call.type === "function_call") toolRuns.push(runTool(call));
+    })
     .done();
   if (toolRuns.length === 0) break;
 
@@ -400,6 +399,56 @@ for (let turn = 0; turn < 10; turn++) {
 ```
 
 The `handlers` map is the list of functions the model may call. `runTool()` returns errors to the model instead of throwing, so the model can recover, and a failing tool can't crash the loop while the stream is still running.
+
+### Shell commands
+
+With the `shell` tool, the model writes shell commands and your application runs them. Use it for agents that work on your machine, such as exploring a repository, running tests, or checking disk space. Each call arrives through the `client_tool_call` listener as a `shell_call`, with the commands in `action.commands`. The model writes these commands, so run them in a sandbox or container, or check each one before running it:
+
+```ts
+import { exec } from "node:child_process";
+import { xAI } from "@xai-official/sdk";
+
+const client = new xAI();
+
+const stream = await client.responses.create({
+  model: "grok-4.7",
+  input: "How much free disk space does this machine have?",
+  tools: [{ type: "shell", environment: { type: "local" } }],
+  stream: true,
+});
+
+await stream
+  .on("client_tool_call", (call) => {
+    if (call.type === "shell_call") {
+      for (const command of call.action.commands) {
+        exec(command, (error, stdout, stderr) => console.log(stdout || stderr));
+      }
+    }
+  })
+  .done();
+```
+
+To let the model use the results, send them back in the next request, like the function outputs in the [tool call loop](#tool-call-loop): `{ type: "shell_call_output", call_id: call.call_id, output: [{ stdout, stderr, outcome: { type: "exit", exit_code: 0 } }] }`.
+
+To give the model skills, list them in the tool's `environment`. A skill is a directory with a `SKILL.md` file of instructions. The model sees each skill's name and description, and when a task matches one, it reads the `SKILL.md` through your shell tool and follows it. If you only allow certain commands, allow reading the skill's directory:
+
+```ts
+const shell: Tool = {
+  type: "shell",
+  environment: {
+    type: "local",
+    skills: [
+      {
+        name: "release-notes",
+        description: "Write release notes from this repo's git log in our house style.",
+        path: "./skills/release-notes",
+      },
+    ],
+  },
+};
+```
+
+Asked to write release notes, the model reads `./skills/release-notes/SKILL.md`, runs the `git log` command it describes, and writes the notes in the format it specifies.
 
 ## Built-in tools
 
@@ -413,7 +462,7 @@ Besides your own functions, the API has built-in tools. Create them with the hel
 - `mcp()` (`mcp`) calls tools on the remote MCP server at `server_url`, identified by `server_label`.
 - `toolSearch()` (`tool_search`) loads the definitions of tools marked `defer_loading: true` when the model needs them, instead of putting every definition in the prompt.
 
-Two kinds of tools run in your application instead: `function` for your own functions, as shown in [Tools](#tools), and `shell`, where the model writes shell commands for your application to run.
+Two kinds of tools run in your application instead: `function` for your own functions, as shown in [Tools](#tools), and `shell`, where the model writes shell commands for your application to run, as shown in [Shell commands](#shell-commands). When you stream, calls to both arrive through the `client_tool_call` listener.
 
 The helpers return plain tool objects, so you can also write `{ type: "web_search" }` yourself. `Tool` autocompletes the known types and accepts any other `type`, such as a tool released after this SDK version, but it doesn't check options the way the helpers do. See the [xAI documentation](https://docs.x.ai) for each tool's options.
 
@@ -452,6 +501,16 @@ const response = await client.responses.create({
 ```
 
 `allowed_x_handles` and `excluded_x_handles` each take up to 20 handles and can't be used together. Set `enable_image_understanding` or `enable_video_understanding` to let the model look at media in posts.
+
+When you stream, each finished search reaches the `server_tool_call` listener as a `custom_tool_call`. Its `name` is the search that ran, such as `x_keyword_search`, and `input` holds the search arguments as a JSON string:
+
+```ts
+await stream
+  .on("server_tool_call", (call) => {
+    if (call.type === "custom_tool_call") console.log(call.name, call.input);
+  })
+  .done();
+```
 
 ### Code execution
 

@@ -49,10 +49,11 @@ export function isKnownStreamEventType(type: string): type is KnownStreamEventTy
   return KNOWN_SET.has(type);
 }
 
-/** Output item types for tools that xAI runs itself. */
+/** Output item types for tools that xAI runs itself. The API sends X search calls as `custom_tool_call` items. */
 export const SERVER_TOOL_CALL_TYPES = [
   "web_search_call",
   "x_search_call",
+  "custom_tool_call",
   "file_search_call",
   "code_interpreter_call",
   "mcp_call",

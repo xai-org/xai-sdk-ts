@@ -9,20 +9,25 @@ import {
   type APIError,
 } from "./errors.js";
 import { parseSse } from "./sse.js";
-import { isFunctionCall, isImageGenerationCall, isMessage } from "./porcelain.js";
+import { isImageGenerationCall, isMessage } from "./porcelain.js";
 import { xAIResponse } from "./response.js";
 import type {
-  FunctionToolCall,
+  ClientToolCall,
   HttpMeta,
   ImageGenerationCall,
   OutputMessage,
   ServerToolCall,
+  ToolCall,
   UrlCitation,
   xAIStreamEvent,
 } from "./types.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isClientToolCall(item: unknown): item is ClientToolCall {
+  return isRecord(item) && (item.type === "function_call" || item.type === "shell_call");
 }
 
 function isServerToolCall(item: unknown): item is ServerToolCall {
@@ -46,7 +51,8 @@ function urlCitations(message: OutputMessage): Array<UrlCitation> {
 type HelperListeners = {
   text: (text: string) => void;
   reasoning: (text: string) => void;
-  tool_call: (call: FunctionToolCall) => void;
+  tool_call: (call: ToolCall) => void;
+  client_tool_call: (call: ClientToolCall) => void;
   server_tool_call: (call: ServerToolCall) => void;
   image: (image: ImageGenerationCall) => void;
   citation: (citation: UrlCitation) => void;
@@ -60,6 +66,7 @@ const HELPER_EVENTS: Record<keyof HelperListeners, true> = {
   text: true,
   reasoning: true,
   tool_call: true,
+  client_tool_call: true,
   server_tool_call: true,
   image: true,
   citation: true,
@@ -155,6 +162,16 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     for (const listener of this.#listeners.get(name) ?? []) listener(value as never);
   }
 
+  #emitToolCall(item: unknown): void {
+    if (isClientToolCall(item)) {
+      this.#emit("tool_call", item);
+      this.#emit("client_tool_call", item);
+    } else if (isServerToolCall(item)) {
+      this.#emit("tool_call", item);
+      this.#emit("server_tool_call", item);
+    }
+  }
+
   #emitHelpers(event: xAIStreamEvent): void {
     switch (event.type) {
       case "response.output_text.delta":
@@ -164,12 +181,8 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
       case "response.reasoning_summary_text.delta":
         this.#emit("reasoning", event.delta);
         break;
-      case "response.output_item.added":
-        if (isServerToolCall(event.item)) this.#emit("server_tool_call", event.item);
-        break;
       case "response.output_item.done":
-        if (isFunctionCall(event.item)) this.#emit("tool_call", event.item);
-        if (isServerToolCall(event.item)) this.#emit("server_tool_call", event.item);
+        this.#emitToolCall(event.item);
         if (isImageGenerationCall(event.item)) this.#emit("image", event.item);
         if (isMessage(event.item)) {
           for (const citation of urlCitations(event.item)) this.#emit("citation", citation);

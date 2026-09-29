@@ -5,7 +5,9 @@ import type {
   InputItem,
   OutputMessage,
   ReasoningItem,
+  ServerToolCall,
   Tool,
+  ToolCall,
   xAIResponse,
   xAIStream,
   xAIStreamEvent,
@@ -65,13 +67,30 @@ export function listenForEvents(stream: xAIStream): xAIStream {
   return stream
     .on("text", (text: string) => text.length)
     .on("reasoning", (text: string) => text.length)
-    .on("tool_call", (call) => JSON.parse(call.arguments) as unknown)
+    .on("tool_call", (call) => describeToolCall(call))
+    .on("client_tool_call", (call) => (call.type === "function_call" ? (JSON.parse(call.arguments) as unknown) : call.action))
     .on("server_tool_call", (call) => `${call.type}: ${String(call.status)}`)
     .on("image", (image) => image.result)
     .on("citation", (citation) => citation.url.length)
     .on("response.function_call_arguments.delta", (event) => event.delta.length)
     .on("response.completed", (event) => event.response.id)
     .on("error", (event) => event.error?.status);
+}
+
+export function describeServerToolCall(call: ServerToolCall): string {
+  // @ts-expect-error tool-specific fields need a type check first
+  void call.name;
+  if (call.type === "custom_tool_call") return `${call.name} ${call.input ?? ""}`;
+  if (call.type === "web_search_call") return JSON.stringify(call.action);
+  return `${call.type}: ${String(call.status)}`;
+}
+
+export function describeToolCall(call: ToolCall): string {
+  // @ts-expect-error function arguments need a type check first
+  void call.arguments;
+  if (call.type === "function_call") return `${call.name}(${call.arguments})`;
+  if (call.type === "shell_call") return JSON.stringify(call.action);
+  return describeServerToolCall(call);
 }
 
 export const requestExamples = [

@@ -18,12 +18,32 @@ export type OutputMessage = Omit<Schema["OutputMessage"], "role" | "type"> & {
 export type FunctionToolCall = Omit<Schema["FunctionToolCall"], "type"> & {
   type: "function_call";
 };
+export type ShellCall = Omit<Schema["ShellCall"], "type"> & {
+  type: "shell_call";
+};
 export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
   type: "reasoning";
 };
 export type ImageGenerationCall = Schema["ImageGenerationCall"];
-/** A tool call that xAI runs itself, such as web search, X search, code execution, or image generation. */
-export type ServerToolCall = OutputItem & { type: ServerToolCallType };
+type ServerCall<S, T extends ServerToolCallType> = Omit<S, "type"> & { type: T };
+/**
+ * A tool call that xAI runs itself, such as web search, X search, code execution, or image generation.
+ * Check `type` before reading fields of a specific tool. X search calls arrive as `custom_tool_call`, with
+ * `name` set to the search that ran and its arguments as a JSON string in `input`.
+ */
+export type ServerToolCall =
+  | ServerCall<Schema["WebSearchCall"], "web_search_call">
+  | ServerCall<Schema["FunctionToolCall"], "x_search_call">
+  | ServerCall<Schema["CustomToolCall"], "custom_tool_call">
+  | ServerCall<Schema["FileSearchCall"], "file_search_call">
+  | ServerCall<Schema["CodeInterpreterCall"], "code_interpreter_call">
+  | ServerCall<Schema["McpCall"], "mcp_call">
+  | ServerCall<Schema["ToolSearchCall"], "tool_search_call">
+  | ServerCall<Schema["ImageGenerationCall"], "image_generation_call">;
+/** A tool call that your code runs: one of your function tools, or a shell command. */
+export type ClientToolCall = FunctionToolCall | ShellCall;
+/** Any tool call, whether your code or xAI runs it. Check `type` to tell them apart. */
+export type ToolCall = ClientToolCall | ServerToolCall;
 export type UrlCitation = Omit<Schema["Annotation"], "type"> & { type: "url_citation" };
 export type IncompleteDetails = Schema["IncompleteDetails"];
 export type DeletedResponse = Schema["DeleteStoredCompletionResponse"];
