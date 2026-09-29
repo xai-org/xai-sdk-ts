@@ -125,12 +125,11 @@ describe("typed errors", () => {
     };
     expect(pkg.engines.node).toBe(">=22.13.0");
     expect(pkg.version).toBe(SDK_VERSION);
-    // Publishable, but restricted until the public release PR flips access.
     expect(pkg.private).toBeUndefined();
     expect(pkg.publishConfig).toEqual({
-      access: "restricted",
+      access: "public",
       registry: "https://registry.npmjs.org/",
-      tag: "internal",
+      tag: "next",
     });
   });
 });
