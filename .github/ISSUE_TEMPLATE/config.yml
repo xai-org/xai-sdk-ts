@@ -1,6 +1,6 @@
 blank_issues_enabled: false
 contact_links:
-  - name: xAI support
+  - name: SpaceXAI support
     url: mailto:support@x.ai
     about: Contact support for API behavior, account, quota, billing, or model capability questions.
   - name: Security vulnerability
