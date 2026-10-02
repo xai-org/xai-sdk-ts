@@ -65,26 +65,26 @@ try {
     JSON.stringify({ private: true, type: "module" }),
   );
   await writeFile(path.join(TEMP, "esm.mjs"), `
-    import { SDK_USER_AGENT, SDK_VERSION, xAI } from "@xai-official/sdk";
+    import { SDK_USER_AGENT, SDK_VERSION, SpaceXAI } from "@xai-official/sdk";
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad ESM version");
     if (SDK_USER_AGENT !== \`xai-sdk/\${SDK_VERSION} (typescript)\`) throw new Error("bad ESM user agent");
-    if (typeof xAI !== "function") throw new Error("missing ESM client");
-    if (typeof new xAI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing ESM images");
+    if (typeof SpaceXAI !== "function") throw new Error("missing ESM client");
+    if (typeof new SpaceXAI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing ESM images");
     const { xSearch } = await import("@xai-official/sdk/tools");
     if (xSearch().type !== "x_search") throw new Error("missing ESM tool helpers");
   `);
   await writeFile(path.join(TEMP, "cjs.cjs"), `
-    const { SDK_USER_AGENT, SDK_VERSION, xAI } = require("@xai-official/sdk");
+    const { SDK_USER_AGENT, SDK_VERSION, SpaceXAI } = require("@xai-official/sdk");
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad CJS version");
     if (SDK_USER_AGENT !== \`xai-sdk/\${SDK_VERSION} (typescript)\`) throw new Error("bad CJS user agent");
-    if (typeof xAI !== "function") throw new Error("missing CJS client");
-    if (typeof new xAI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing CJS images");
+    if (typeof SpaceXAI !== "function") throw new Error("missing CJS client");
+    if (typeof new SpaceXAI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing CJS images");
     const { xSearch } = require("@xai-official/sdk/tools");
     if (xSearch().type !== "x_search") throw new Error("missing CJS tool helpers");
   `);
   await writeFile(path.join(TEMP, "consumer.ts"), `
     import {
-      xAI,
+      SpaceXAI,
       isImageGenerationCall,
       type CreateParams,
       type DeletedResponse,
@@ -116,7 +116,7 @@ try {
       input: "test",
       tools: [{ type: "web_search" }],
     };
-    const client: xAI = new xAI({ apiKey: "test", fetch: globalThis.fetch });
+    const client: SpaceXAI = new SpaceXAI({ apiKey: "test", fetch: globalThis.fetch });
     const imageModel: KnownImageModelId = "grok-imagine-image-2.0";
     const generate: ImageGenerateParams = {
       model: imageModel,

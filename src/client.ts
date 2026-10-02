@@ -20,7 +20,7 @@ import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
 
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
 
-export class xAI {
+export class SpaceXAI {
   readonly baseURL: string;
   readonly timeout: number;
   readonly idleTimeout: number;
@@ -45,7 +45,7 @@ export class xAI {
     assertNodeVersion();
     if (isBrowser() && !opts.dangerouslyAllowBrowser) {
       throw new Error(
-        "xAI: browser and worker use is disabled because it can expose secret API credentials; " +
+        "SpaceXAI: browser and worker use is disabled because it can expose secret API credentials; " +
           "set dangerouslyAllowBrowser: true only if you understand the risk",
       );
     }
@@ -53,8 +53,8 @@ export class xAI {
     if (!apiKey) {
       throw new Error(
         isNode()
-          ? "xAI: apiKey is missing (set XAI_API_KEY or pass apiKey)"
-          : "xAI: pass apiKey from a server; do not use a secret API key in browsers or Workers",
+          ? "SpaceXAI: apiKey is missing (set XAI_API_KEY or pass apiKey)"
+          : "SpaceXAI: pass apiKey from a server; do not use a secret API key in browsers or Workers",
       );
     }
     storeApiKey(this, apiKey);

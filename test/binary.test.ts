@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { xAIBinaryResponse } from "../src/index.js";
+import { BinaryResponse } from "../src/index.js";
 
-function binaryResponse(body: BodyInit | null, headers: Record<string, string> = {}): xAIBinaryResponse {
-  return new xAIBinaryResponse(new Response(body).body, {
+function binaryResponse(body: BodyInit | null, headers: Record<string, string> = {}): BinaryResponse {
+  return new BinaryResponse(new Response(body).body, {
     status: 200,
     headers: new Headers(headers),
     requestId: "req_test",
@@ -10,7 +10,7 @@ function binaryResponse(body: BodyInit | null, headers: Record<string, string> =
   });
 }
 
-describe("xAIBinaryResponse", () => {
+describe("BinaryResponse", () => {
   it("reads the body as bytes or as a Blob typed with the content type", async () => {
     const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0x00]);
     const headers = { "content-type": "application/zip" };

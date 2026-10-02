@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the xAI TypeScript SDK will be documented in this file.
+All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
 ## [0.1.0] - 2026-10-02
 

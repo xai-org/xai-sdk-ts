@@ -8,9 +8,9 @@ import type {
   ServerToolCall,
   Tool,
   ToolCall,
-  xAIResponse,
-  xAIStream,
-  xAIStreamEvent,
+  ModelResponse,
+  ResponseStream,
+  ResponseStreamEvent,
 } from "../src/index.js";
 
 type Assert<T extends true> = T;
@@ -46,20 +46,20 @@ export type ReasoningHasLiteralType = Assert<
   ReasoningItem["type"] extends "reasoning" ? true : false
 >;
 export type StreamEventTypesAreKnown = Assert<
-  Equals<KnownStreamEventType, Exclude<xAIStreamEvent["type"], "unknown">>
+  Equals<KnownStreamEventType, Exclude<ResponseStreamEvent["type"], "unknown">>
 >;
 export type StreamDoneResolvesToResponse = Assert<
-  Equals<Awaited<ReturnType<xAIStream["done"]>>, xAIResponse>
+  Equals<Awaited<ReturnType<ResponseStream["done"]>>, ModelResponse>
 >;
 
-export function responseFields(response: xAIResponse): Array<unknown> {
+export function responseFields(response: ModelResponse): Array<unknown> {
   // @ts-expect-error fields the SDK doesn't know aren't typed on the response
   void response.field_added_later;
   const temperature: number | null | undefined = response.temperature;
   return [temperature, response.raw.field_added_later];
 }
 
-export function listenForEvents(stream: xAIStream): xAIStream {
+export function listenForEvents(stream: ResponseStream): ResponseStream {
   // @ts-expect-error unknown event names are rejected
   stream.on("tool_calls", () => {});
   // @ts-expect-error event listeners receive the event, not its text

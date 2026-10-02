@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APIProtocolError, type TokenizeParams, xAI } from "../src/index.js";
+import { APIProtocolError, type TokenizeParams, SpaceXAI } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
 const tokenizeResponse = {
@@ -10,8 +10,8 @@ const tokenizeResponse = {
   ],
 };
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 describe("tokenizer.encode", () => {

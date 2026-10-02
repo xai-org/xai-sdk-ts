@@ -27,7 +27,7 @@ export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
 export type ImageGenerationCall = Schema["ImageGenerationCall"];
 type ServerCall<S, T extends ServerToolCallType> = Omit<S, "type"> & { type: T };
 /**
- * A tool call that xAI runs itself, such as web search, X search, code execution, or image generation.
+ * A tool call that SpaceXAI runs itself, such as web search, X search, code execution, or image generation.
  * Check `type` before reading fields of a specific tool. X search calls arrive as `custom_tool_call`, with
  * `name` set to the search that ran and its arguments as a JSON string in `input`.
  */
@@ -42,7 +42,7 @@ export type ServerToolCall =
   | ServerCall<Schema["ImageGenerationCall"], "image_generation_call">;
 /** A tool call that your code runs: one of your function tools, or a shell command. */
 export type ClientToolCall = FunctionToolCall | ShellCall;
-/** Any tool call, whether your code or xAI runs it. Check `type` to tell them apart. */
+/** Any tool call, whether your code or SpaceXAI runs it. Check `type` to tell them apart. */
 export type ToolCall = ClientToolCall | ServerToolCall;
 export type UrlCitation = Omit<Schema["Annotation"], "type"> & { type: "url_citation" };
 export type IncompleteDetails = Schema["IncompleteDetails"];
@@ -620,7 +620,7 @@ type StreamEvent =
       sequence_number?: number;
     };
 
-export type xAIStreamEvent =
+export type ResponseStreamEvent =
   | Exclude<StreamEvent, { type: "error" }>
   | (Extract<StreamEvent, { type: "error" }> & { error?: import("./errors.js").APIError })
   | { type: "unknown"; raw: unknown };

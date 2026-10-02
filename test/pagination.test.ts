@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { APIStatusError, PermissionDeniedError, xAI } from "../src/index.js";
+import { APIStatusError, PermissionDeniedError, SpaceXAI } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 function pages(...bodies: Array<unknown>) {
@@ -35,7 +35,7 @@ describe("pagination", () => {
     ]);
   });
 
-  it.each<[string, (c: xAI) => AsyncIterable<unknown>, string]>([
+  it.each<[string, (c: SpaceXAI) => AsyncIterable<unknown>, string]>([
     ["batches.list", (c) => c.batches.list(), "batches"],
     ["batches.results", (c) => c.batches.results("batch_1"), "results"],
     ["batches.requests.list", (c) => c.batches.requests.list("batch_1"), "batch_request_metadata"],

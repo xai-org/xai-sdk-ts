@@ -1,7 +1,7 @@
 import { withClientRequestId } from "./errors.js";
 import type { HttpMeta } from "./types.js";
 
-export class xAIBinaryResponse {
+export class BinaryResponse {
   body: ReadableStream<Uint8Array> | null;
   contentType: string | null;
   http: HttpMeta;

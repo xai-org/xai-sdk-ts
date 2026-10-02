@@ -14,14 +14,14 @@ import type {
   VideoGenerationModelList,
 } from "../types.js";
 import type { ImageModelId, ModelId, VideoModelId } from "../models.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 export class ModelsResource {
   readonly language: LanguageModels;
   readonly image: ImageModels;
   readonly video: VideoModels;
 
-  constructor(private readonly client: xAI) {
+  constructor(private readonly client: SpaceXAI) {
     this.language = new LanguageModels(client);
     this.image = new ImageModels(client);
     this.video = new VideoModels(client);
@@ -70,7 +70,7 @@ export class ModelsResource {
 }
 
 export class LanguageModels {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async list(opts?: RequestOpts): Promise<LanguageModelList & { http: HttpMeta }> {
     const result = await send(this.client, {
@@ -114,7 +114,7 @@ export class LanguageModels {
 }
 
 export class ImageModels {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async list(opts?: RequestOpts): Promise<ImageGenerationModelList & { http: HttpMeta }> {
     const result = await send(this.client, {
@@ -161,7 +161,7 @@ export class ImageModels {
 }
 
 export class VideoModels {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async list(opts?: RequestOpts): Promise<VideoGenerationModelList & { http: HttpMeta }> {
     const result = await send(this.client, {

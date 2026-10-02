@@ -16,7 +16,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function copyWireFields(target: xAIResponse, wire: Record<string, unknown>): void {
+function copyWireFields(target: ModelResponse, wire: Record<string, unknown>): void {
   const proto = Object.getPrototypeOf(target) as object;
   for (const [key, value] of Object.entries(wire)) {
     if (SKIP_KEYS.has(key) || OWN_KEYS.has(key) || key in proto) continue;
@@ -25,9 +25,9 @@ function copyWireFields(target: xAIResponse, wire: Record<string, unknown>): voi
 }
 
 // oxlint-disable-next-line typescript/no-unsafe-declaration-merging -- every merged field is optional and copied from the API response
-export interface xAIResponse extends ResponseFields {}
+export interface ModelResponse extends ResponseFields {}
 
-export class xAIResponse {
+export class ModelResponse {
   id: string;
   status: string;
   output: Array<OutputItem>;

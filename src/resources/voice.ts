@@ -1,6 +1,6 @@
 import { send, type SendResult } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
-import { xAIBinaryResponse } from "../binary.js";
+import { BinaryResponse } from "../binary.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type {
@@ -20,7 +20,7 @@ import type {
   VoiceList,
 } from "../types.js";
 import type { VoiceId } from "../generated/voice.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 /** Fields sent after `file` may be ignored, so `file` is appended last. */
 function toFormData({ file, ...fields }: { file?: Blob } & Record<string, unknown>): FormData {
@@ -49,7 +49,7 @@ export class VoiceResource {
   readonly custom: CustomVoices;
   readonly clientSecrets: ClientSecrets;
 
-  constructor(private readonly client: xAI) {
+  constructor(private readonly client: SpaceXAI) {
     this.custom = new CustomVoices(client);
     this.clientSecrets = new ClientSecrets(client);
   }
@@ -57,11 +57,11 @@ export class VoiceResource {
   speak<T extends string, Timestamps extends boolean | undefined = undefined>(
     body: SpeechParams<T> & { with_timestamps?: Timestamps },
     opts?: RequestOpts,
-  ): Promise<Timestamps extends true ? SpeechWithTimestamps & { http: HttpMeta } : xAIBinaryResponse>;
+  ): Promise<Timestamps extends true ? SpeechWithTimestamps & { http: HttpMeta } : BinaryResponse>;
   async speak(
     body: SpeechParams,
     opts?: RequestOpts,
-  ): Promise<xAIBinaryResponse | (SpeechWithTimestamps & { http: HttpMeta })> {
+  ): Promise<BinaryResponse | (SpeechWithTimestamps & { http: HttpMeta })> {
     const binary = body.with_timestamps !== true;
     const result = await send(this.client, {
       method: "POST",
@@ -70,7 +70,7 @@ export class VoiceResource {
       binary,
       opts,
     });
-    if (binary) return new xAIBinaryResponse(result.body, result.http);
+    if (binary) return new BinaryResponse(result.body, result.http);
     const speech = requireRecord(result.payload, result.http, "Speech response");
     if (typeof speech.audio !== "string") {
       throw new APIProtocolError("Speech response is missing audio", {
@@ -136,7 +136,7 @@ export class VoiceResource {
 }
 
 export class CustomVoices {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async create(
     body: CustomVoiceCreateParams,
@@ -216,19 +216,19 @@ export class CustomVoices {
     return { ...(body as { deleted: true }), http: result.http };
   }
 
-  async getAudio(voiceId: string, opts?: RequestOpts): Promise<xAIBinaryResponse> {
+  async getAudio(voiceId: string, opts?: RequestOpts): Promise<BinaryResponse> {
     const result = await send(this.client, {
       method: "GET",
       path: `/custom-voices/${encodeURIComponent(voiceId)}/audio`,
       binary: true,
       opts,
     });
-    return new xAIBinaryResponse(result.body, result.http);
+    return new BinaryResponse(result.body, result.http);
   }
 }
 
 export class ClientSecrets {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async create(
     body: ClientSecretCreateParams = {},

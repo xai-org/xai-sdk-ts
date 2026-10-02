@@ -7,7 +7,7 @@ import {
   type VideoEditParams,
   type VideoExtendParams,
   type VideoGenerateParams,
-  xAI,
+  SpaceXAI,
 } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
@@ -45,8 +45,8 @@ const videoModel = {
   aliases: ["grok-imagine-video-1.5-preview"],
 };
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 function pendingResponse(): Response {

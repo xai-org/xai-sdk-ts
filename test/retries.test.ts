@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { xAI } from "../src/index.js";
+import { SpaceXAI } from "../src/index.js";
 import { completedResponse, createBody, erroringSse, jsonResponse, mockFetch, sseResponse } from "./helpers.js";
 
 describe("retries", () => {
@@ -13,7 +13,7 @@ describe("retries", () => {
       }
       return sseResponse([{ type: "response.completed", response: completedResponse }]);
     });
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     for await (const event of stream) types.push(event.type);
@@ -23,14 +23,14 @@ describe("retries", () => {
 
   it("does not retry POST after HTTP 200 when the stream errors before the first SSE byte", async () => {
     const { fetch, captured } = mockFetch(() => erroringSse(true));
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
     await expect(client.responses.create({ ...createBody, stream: true })).rejects.toThrow();
     expect(captured.requests).toHaveLength(1);
   });
 
   it("does not retry after the first SSE byte", async () => {
     const { fetch, captured } = mockFetch(() => erroringSse(false));
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(async () => {
       for await (const _ of stream) {
@@ -47,7 +47,7 @@ describe("retries", () => {
         { status: 529, headers: { "retry-after": "0" } },
       ),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
     await expect(client.responses.create(createBody)).rejects.toMatchObject({ status: 529 });
     expect(captured.requests).toHaveLength(1);
   });

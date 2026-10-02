@@ -10,8 +10,8 @@ import type {
   SpeechWithTimestamps,
   TranscriptionParams,
   UnsafeSpeechText,
-  xAI,
-  xAIBinaryResponse,
+  SpaceXAI,
+  BinaryResponse,
 } from "../src/index.js";
 import type { SpeechText } from "../src/speech-tags.js";
 
@@ -20,7 +20,7 @@ type IsOptional<T, K extends keyof T> = {} extends Pick<T, K> ? true : false;
 type Equals<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
-export async function speakResults(client: xAI) {
+export async function speakResults(client: SpaceXAI) {
   return {
     audio: await client.voice.speak({ text: "Hello", language: "en" }),
     timed: await client.voice.speak({ text: "Hello", language: "en", with_timestamps: true }),
@@ -29,7 +29,7 @@ export async function speakResults(client: xAI) {
 
 type Spoken = Awaited<ReturnType<typeof speakResults>>;
 
-export type SpeakReturnsAudioBytes = Assert<Equals<Spoken["audio"], xAIBinaryResponse>>;
+export type SpeakReturnsAudioBytes = Assert<Equals<Spoken["audio"], BinaryResponse>>;
 export type TimestampsReturnJson = Assert<
   Equals<Spoken["timed"], SpeechWithTimestamps & { http: HttpMeta }>
 >;
@@ -40,7 +40,7 @@ export type CustomVoiceFileIsRequired = Assert<
   IsOptional<CustomVoiceCreateParams, "file"> extends false ? true : false
 >;
 
-export async function speechTagChecks(client: xAI) {
+export async function speechTagChecks(client: SpaceXAI) {
   await client.voice.speak({ text: "Hi [gasp] there." as UnsafeSpeechText, language: "en" });
   // @ts-expect-error `[luff]` is not a speech tag.
   await client.voice.speak({ text: "Hi [luff] there.", language: "en" });

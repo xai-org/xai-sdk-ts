@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APIProtocolError, type CompactParams, type InputItem, xAI } from "../src/index.js";
+import { APIProtocolError, type CompactParams, type InputItem, SpaceXAI } from "../src/index.js";
 import { completedResponse, jsonResponse, mockFetch } from "./helpers.js";
 
 const model = "grok-4.6";
@@ -26,8 +26,8 @@ const compactResponse = {
   },
 };
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 async function jsonBody(request: Request | undefined): Promise<Record<string, unknown>> {

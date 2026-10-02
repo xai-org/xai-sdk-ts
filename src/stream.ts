@@ -10,7 +10,7 @@ import {
 } from "./errors.js";
 import { parseSse } from "./sse.js";
 import { isImageGenerationCall, isMessage } from "./porcelain.js";
-import { xAIResponse } from "./response.js";
+import { ModelResponse } from "./response.js";
 import type {
   ClientToolCall,
   HttpMeta,
@@ -19,7 +19,7 @@ import type {
   ServerToolCall,
   ToolCall,
   UrlCitation,
-  xAIStreamEvent,
+  ResponseStreamEvent,
 } from "./types.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -59,7 +59,7 @@ type HelperListeners = {
 };
 
 type StreamListeners = HelperListeners & {
-  [T in xAIStreamEvent["type"]]: (event: Extract<xAIStreamEvent, { type: T }>) => void;
+  [T in ResponseStreamEvent["type"]]: (event: Extract<ResponseStreamEvent, { type: T }>) => void;
 };
 
 const HELPER_EVENTS: Record<keyof HelperListeners, true> = {
@@ -72,7 +72,7 @@ const HELPER_EVENTS: Record<keyof HelperListeners, true> = {
   citation: true,
 };
 
-export class xAIStream implements AsyncIterable<xAIStreamEvent> {
+export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
   readonly http: HttpMeta;
 
   #body: ReadableStream<Uint8Array> | null;
@@ -85,7 +85,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
   #final: Record<string, unknown> | undefined;
   #error: APIError | undefined;
   #ended = Promise.withResolvers<void>();
-  #done: Promise<xAIResponse> | undefined;
+  #done: Promise<ModelResponse> | undefined;
 
   constructor(init: {
     body: ReadableStream<Uint8Array> | null;
@@ -118,7 +118,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
    * Reads the rest of the stream, unless a loop is already reading it, and resolves to the final response.
    * Rejects if the stream fails or closes before the response completes.
    */
-  done(): Promise<xAIResponse> {
+  done(): Promise<ModelResponse> {
     if (!this.#done) {
       if (!this.#consumed) void this.#drain();
       this.#done = this.#ended.promise.then(() => this.#finalResponse());
@@ -141,7 +141,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     }
   }
 
-  async *[Symbol.asyncIterator](): AsyncGenerator<xAIStreamEvent> {
+  async *[Symbol.asyncIterator](): AsyncGenerator<ResponseStreamEvent> {
     if (this.#consumed) throw new Error("Stream already iterated");
     this.#consumed = true;
     try {
@@ -172,7 +172,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     }
   }
 
-  #emitHelpers(event: xAIStreamEvent): void {
+  #emitHelpers(event: ResponseStreamEvent): void {
     switch (event.type) {
       case "response.output_text.delta":
         this.#emit("text", event.delta);
@@ -203,7 +203,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     }
   }
 
-  #finalResponse(): xAIResponse {
+  #finalResponse(): ModelResponse {
     if (this.#error) throw this.#error;
     if (!this.#final) {
       throw new AbortError("Stream closed before the response completed", {
@@ -211,10 +211,10 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
         clientRequestId: this.http.clientRequestId,
       });
     }
-    return new xAIResponse(this.#final, this.http);
+    return new ModelResponse(this.#final, this.http);
   }
 
-  async *#events(): AsyncGenerator<xAIStreamEvent> {
+  async *#events(): AsyncGenerator<ResponseStreamEvent> {
     if (!this.#body) return;
     try {
       for await (const raw of parseSse(this.#body, {
@@ -237,7 +237,7 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
         this.http.clientRequestId,
       );
       if (mapped instanceof TimeoutError) {
-        const event: xAIStreamEvent = {
+        const event: ResponseStreamEvent = {
           type: "error",
           message: mapped.message,
           error: mapped,
@@ -250,21 +250,21 @@ export class xAIStream implements AsyncIterable<xAIStreamEvent> {
     }
   }
 
-  #normalize(raw: unknown): xAIStreamEvent {
+  #normalize(raw: unknown): ResponseStreamEvent {
     if (!isRecord(raw)) return { type: "unknown", raw };
     const type = raw.type;
     if (type === "error") {
       const { event, error } = streamErrorEvent(raw, this.#requestId);
       withClientRequestId(error, this.http.clientRequestId);
-      return event as xAIStreamEvent;
+      return event as ResponseStreamEvent;
     }
     if (typeof type === "string" && isKnownStreamEventType(type)) {
-      return raw as xAIStreamEvent;
+      return raw as ResponseStreamEvent;
     }
     return { type: "unknown", raw };
   }
 
-  #apply(event: xAIStreamEvent): void {
+  #apply(event: ResponseStreamEvent): void {
     switch (event.type) {
       case "response.completed":
       case "response.failed":

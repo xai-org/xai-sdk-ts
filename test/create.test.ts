@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { xAI, SDK_VERSION } from "../src/index.js";
+import { SpaceXAI, SDK_VERSION } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch, usageFixture } from "./helpers.js";
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 describe("responses.create", () => {
@@ -11,9 +11,9 @@ describe("responses.create", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     vi.stubGlobal("window", { document: {} });
     try {
-      expect(() => new xAI({ apiKey: "test-key", fetch })).toThrow(/use is disabled/);
+      expect(() => new SpaceXAI({ apiKey: "test-key", fetch })).toThrow(/use is disabled/);
       expect(
-        () => new xAI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
+        () => new SpaceXAI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
       ).not.toThrow();
     } finally {
       vi.unstubAllGlobals();
@@ -24,9 +24,9 @@ describe("responses.create", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     vi.stubGlobal("WorkerGlobalScope", class WorkerGlobalScope {});
     try {
-      expect(() => new xAI({ apiKey: "test-key", fetch })).toThrow(/worker use is disabled/);
+      expect(() => new SpaceXAI({ apiKey: "test-key", fetch })).toThrow(/worker use is disabled/);
       expect(
-        () => new xAI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
+        () => new SpaceXAI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
       ).not.toThrow();
     } finally {
       vi.unstubAllGlobals();
@@ -121,7 +121,7 @@ describe("responses.create", () => {
 
   it("keeps SDK attribution headers when the caller sets them", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new xAI({
+    await new SpaceXAI({
       apiKey: "test-key",
       fetch,
       maxRetries: 0,
@@ -139,7 +139,7 @@ describe("responses.create", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     const onRequest = vi.fn();
     const onResponse = vi.fn();
-    const c = new xAI({ apiKey: "test-key", fetch, maxRetries: 0, onRequest, onResponse });
+    const c = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0, onRequest, onResponse });
     await c.responses.create(createBody);
     expect(onRequest).toHaveBeenCalledOnce();
     expect(onResponse).toHaveBeenCalledOnce();

@@ -7,7 +7,7 @@ export function storeApiKey(client: object, apiKey: string): void {
 export function apiKeyFor(client: object): string {
   const apiKey = API_KEYS.get(client);
   if (apiKey === undefined) {
-    throw new Error("xAI: internal API key state is unavailable");
+    throw new Error("SpaceXAI: internal API key state is unavailable");
   }
   return apiKey;
 }

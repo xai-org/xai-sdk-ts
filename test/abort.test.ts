@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AbortError, APIError, xAI } from "../src/index.js";
+import { AbortError, APIError, SpaceXAI } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch, sseResponse } from "./helpers.js";
 
 describe("abort", () => {
@@ -11,7 +11,7 @@ describe("abort", () => {
     }
     const ac = new AbortController();
     const { fetch, captured } = mockFetch(() => sseResponse([]));
-    const pending = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
+    const pending = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
       {
         model: "grok-4.6",
         input: [
@@ -41,7 +41,7 @@ describe("abort", () => {
       }
     }
     const { fetch, captured } = mockFetch(() => sseResponse([]));
-    const pending = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
+    const pending = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
       {
         model: "grok-4.6",
         input: [
@@ -66,7 +66,7 @@ describe("abort", () => {
       }
     }
     const { fetch, captured } = mockFetch(() => sseResponse([]));
-    const pending = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
+    const pending = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
       {
         model: "grok-4.6",
         input: [
@@ -84,7 +84,7 @@ describe("abort", () => {
 
   it("completes a Blob read when the attached signal never aborts", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new xAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
+    await new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create(
       {
         model: "grok-4.6",
         input: [
@@ -110,7 +110,7 @@ describe("abort", () => {
         { hang: true },
       ),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true }, { signal: ac.signal });
     const iter = stream[Symbol.asyncIterator]();
     const first = await iter.next();
@@ -142,7 +142,7 @@ describe("abort", () => {
           { status: 200, headers: { "content-type": "text/event-stream", "x-request-id": "req_test" } },
         ),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await stream.close();
     expect(cancelled).toBe(true);
@@ -165,7 +165,7 @@ describe("abort", () => {
           { headers: { "content-type": "text/event-stream", "x-request-id": "req_test" } },
         ),
     );
-    const stream = await new xAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create({
+    const stream = await new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 }).responses.create({
       ...createBody,
       stream: true,
     });

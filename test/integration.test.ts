@@ -1,7 +1,7 @@
 import { createServer, type RequestListener } from "node:http";
 import { once } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
-import { APIConnectionError, xAI } from "../src/index.js";
+import { APIConnectionError, SpaceXAI } from "../src/index.js";
 import { completedResponse, createBody } from "./helpers.js";
 
 const servers = new Set<ReturnType<typeof createServer>>();
@@ -41,7 +41,7 @@ describe("native fetch integration", () => {
       });
       response.end(JSON.stringify(completedResponse));
     });
-    const result = await new xAI({
+    const result = await new SpaceXAI({
       apiKey: "test-key",
       baseURL,
       maxRetries: 0,
@@ -67,7 +67,7 @@ describe("native fetch integration", () => {
         );
       }, 5);
     });
-    const stream = await new xAI({
+    const stream = await new SpaceXAI({
       apiKey: "test-key",
       baseURL,
       maxRetries: 0,
@@ -94,7 +94,7 @@ describe("native fetch integration", () => {
       response.end();
     });
     await expect(
-      new xAI({ apiKey: "test-key", baseURL, maxRetries: 0 }).responses.create(createBody),
+      new SpaceXAI({ apiKey: "test-key", baseURL, maxRetries: 0 }).responses.create(createBody),
     ).rejects.toBeInstanceOf(APIConnectionError);
     expect(reachedRedirectTarget).toBe(false);
   });
