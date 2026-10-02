@@ -397,6 +397,31 @@ describe("stream.on and stream.done", () => {
     ]);
   });
 
+  it("sends partial JSON to json listeners when the request asks for JSON output", async () => {
+    const deltas = ['{"lines": [{"speaker": "A', '", "text": "Hi"}, {"spea', 'ker": "B"}]}'];
+    const { fetch } = mockFetch(() =>
+      sseResponse([
+        ...deltas.map((delta) => ({ type: "response.output_text.delta", output_index: 0, content_index: 0, delta })),
+        { type: "response.completed", response: completedResponse },
+      ]),
+    );
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const format = { type: "json_schema" as const, name: "script", schema: {} };
+    const seen: Array<unknown> = [];
+    const stream = await client.responses.create({ ...createBody, text: { format }, stream: true });
+    await stream.on("json", (value) => seen.push(value)).done();
+    expect(seen).toEqual([
+      { lines: [{ speaker: "A" }] },
+      { lines: [{ speaker: "A", text: "Hi" }, {}] },
+      { lines: [{ speaker: "A", text: "Hi" }, { speaker: "B" }] },
+    ]);
+
+    const ignored: Array<unknown> = [];
+    const plain = await client.responses.create({ ...createBody, stream: true });
+    await plain.on("json", (value) => ignored.push(value)).done();
+    expect(ignored).toEqual([]);
+  });
+
   it("waits for a loop that is already reading the stream", async () => {
     const stream = await streamOf(events);
     const texts: Array<string> = [];

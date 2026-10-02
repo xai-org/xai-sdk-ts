@@ -29,6 +29,8 @@ describe("http helpers", () => {
     expect(shouldRetryStatus("GET", 529)).toBe(true);
     expect(shouldRetryStatus("DELETE", 502)).toBe(false);
     expect(shouldRetryStatus("POST", 409)).toBe(false);
+    expect(shouldRetryStatus("POST", 503, true)).toBe(true);
+    expect(shouldRetryStatus("POST", 400, true)).toBe(false);
   });
 
   it("honors Retry-After HTTP-date and integer seconds", () => {
@@ -490,6 +492,14 @@ describe("retryDelayMs jitter", () => {
   it("uses Math.random for exponential backoff when Retry-After is absent", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     expect(retryDelayMs(0, null)).toBe(187.5);
+    vi.restoreAllMocks();
+  });
+
+  it("waits longer before retrying a 429 without Retry-After", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    expect(retryDelayMs(0, null, 429)).toBe(750);
+    expect(retryDelayMs(10, null, 429)).toBe(22_500);
+    expect(retryDelayMs(0, "2", 429)).toBe(2_000);
     vi.restoreAllMocks();
   });
 });

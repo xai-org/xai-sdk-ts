@@ -25,8 +25,9 @@ export class SpaceXAI {
   readonly timeout: number;
   readonly idleTimeout: number;
   readonly maxResponseBodyBytes: number;
-  /** Retry count (jitter + Retry-After). Creates retry only explicit 429 responses. */
+  /** Retry count (jitter + Retry-After). Creates retry only explicit 429 responses, unless `retryBeforeOutput` is set. */
   readonly maxRetries: number;
+  readonly retryBeforeOutput: boolean;
   readonly defaultHeaders: Record<string, string>;
   readonly fetch: typeof fetch;
   readonly onRequest?: RequestHook;
@@ -64,6 +65,7 @@ export class SpaceXAI {
     this.maxResponseBodyBytes =
       opts.maxResponseBodyBytes ?? DEFAULT_MAX_RESPONSE_BODY_BYTES;
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.retryBeforeOutput = opts.retryBeforeOutput ?? false;
     this.defaultHeaders = { ...opts.defaultHeaders };
     this.fetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
     this.onRequest = opts.onRequest;
@@ -86,6 +88,7 @@ export class SpaceXAI {
       idleTimeout: this.idleTimeout,
       maxResponseBodyBytes: this.maxResponseBodyBytes,
       maxRetries: this.maxRetries,
+      retryBeforeOutput: this.retryBeforeOutput,
     };
   }
 }

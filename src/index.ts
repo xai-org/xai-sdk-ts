@@ -26,7 +26,9 @@ export {
   toText,
 } from "./porcelain.js";
 export type { PagePromise } from "./pagination.js";
-export type { UnsafeSpeechText } from "./speech-tags.js";
+export { parsePartialJson } from "./partial-json.js";
+export { checkSpeechText, stripInvalidSpeechTags, type UnsafeSpeechText } from "./speech-tags.js";
+export { INLINE_SPEECH_TAGS, WRAPPING_SPEECH_TAGS } from "./generated/voice.js";
 export type { MediaUsage, Usage } from "./usage.js";
 export type {
   ImageModelId,
@@ -105,6 +107,8 @@ export type {
   ShellCall,
   SpeechParams,
   SpeechWithTimestamps,
+  StandardSchema,
+  StandardSchemaIssue,
   Token,
   TokenizeParams,
   TokenizeResponse,

@@ -2,7 +2,14 @@ import { APIProtocolError, requestIds } from "./errors.js";
 import { parseJsonOutput, toInput, toText } from "./porcelain.js";
 import { mapUsage, type Usage } from "./usage.js";
 import type { components } from "./generated/types.js";
-import type { HttpMeta, IncompleteDetails, InputItem, OutputItem } from "./types.js";
+import type {
+  HttpMeta,
+  IncompleteDetails,
+  InputItem,
+  OutputItem,
+  StandardSchema,
+  StandardSchemaIssue,
+} from "./types.js";
 
 const SKIP_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const OWN_KEYS = new Set(["id", "status", "output", "incomplete_details", "usage", "http", "raw"]);
@@ -14,6 +21,24 @@ type ResponseFields = Partial<
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatIssue(issue: StandardSchemaIssue): string {
+  const path = issue.path?.map((segment) => String(typeof segment === "object" ? segment.key : segment)).join(".");
+  return path ? `${path}: ${issue.message}` : issue.message;
+}
+
+function validateJson<Output>(schema: StandardSchema<Output>, value: unknown): Output {
+  const result = schema["~standard"].validate(value);
+  if (result instanceof Promise) {
+    throw new TypeError("toJson() needs a schema that validates synchronously");
+  }
+  if (result.issues) {
+    throw new Error(`Structured output doesn't match the schema: ${result.issues.map(formatIssue).join("; ")}`, {
+      cause: result.issues,
+    });
+  }
+  return result.value;
 }
 
 function copyWireFields(target: ModelResponse, wire: Record<string, unknown>): void {
@@ -78,7 +103,15 @@ export class ModelResponse {
     return toInput(this.output);
   }
 
-  toJson(): unknown {
-    return parseJsonOutput(this.output, this.status, true);
+  /**
+   * Parses the completed text output as JSON. Pass a Standard Schema validator that validates synchronously,
+   * such as a Zod, Valibot, or ArkType schema, to check the result and get its type; without one, the result
+   * is `unknown`.
+   */
+  toJson(): unknown;
+  toJson<Output>(schema: StandardSchema<Output>): Output;
+  toJson(schema?: StandardSchema): unknown {
+    const value = parseJsonOutput(this.output, this.status, true);
+    return schema === undefined ? value : validateJson(schema, value);
   }
 }
