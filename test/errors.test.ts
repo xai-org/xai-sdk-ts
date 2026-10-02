@@ -8,14 +8,14 @@ import {
   RateLimitError,
   SDK_VERSION,
   TimeoutError,
-  xAI,
+  SpaceXAI,
 } from "../src/index.js";
 import { createBody, jsonResponse, mockFetch } from "./helpers.js";
 
 describe("typed errors", () => {
-  function client(status: number, body: unknown): xAI {
+  function client(status: number, body: unknown): SpaceXAI {
     const { fetch } = mockFetch(() => jsonResponse(body, { status }));
-    return new xAI({ apiKey: "k", fetch, maxRetries: 0 });
+    return new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 });
   }
 
   it("maps status codes to classes and APIError.is", async () => {
@@ -111,7 +111,7 @@ describe("typed errors", () => {
           { status: 200, headers: { "content-type": "application/json", "x-request-id": "req_test" } },
         ),
     );
-    const c = new xAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20, timeout: 5_000 });
+    const c = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20, timeout: 5_000 });
     await expect(c.responses.create({ ...createBody, stream: false })).rejects.toBeInstanceOf(TimeoutError);
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isFunctionCall, isMessage, isReasoning, xAI } from "../src/index.js";
+import { isFunctionCall, isMessage, isReasoning, SpaceXAI } from "../src/index.js";
 import { inlineImageInput } from "../src/porcelain.js";
 import {
   completedResponse,
@@ -27,14 +27,14 @@ describe("porcelain", () => {
         ],
       }),
     );
-    return new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody).then((res) => {
+    return new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody).then((res) => {
       expect(res.toText()).toBe("AB");
     });
   });
 
   it("toInput echoes all output items including reasoning", async () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
-    const res = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     const next = res.toInput();
     expect(next).toHaveLength(2);
     expect(isReasoning(next[0])).toBe(true);
@@ -49,7 +49,7 @@ describe("porcelain", () => {
         output: [{ type: "function_call", name: "fn", arguments: "{}" }],
       }),
     );
-    const res = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toBeNull();
     expect(() => res.toJson()).toThrow(/no output_text/);
   });
@@ -67,14 +67,14 @@ describe("porcelain", () => {
         ],
       }),
     );
-    const res = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toBeNull();
     expect(() => res.toJson()).toThrow(SyntaxError);
   });
 
   it("toJson/parsed work for completed json_schema output", async () => {
     const { fetch } = mockFetch(() => jsonResponse(jsonSchemaResponse));
-    const res = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toEqual({ ok: true });
     expect(res.toJson()).toEqual({ ok: true });
   });
@@ -100,7 +100,7 @@ describe("porcelain", () => {
         },
       ]),
     );
-    const stream = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    const stream = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       ...createBody,
       stream: true,
     });

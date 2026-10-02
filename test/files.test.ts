@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { xAI, xAIBinaryResponse } from "../src/index.js";
+import { SpaceXAI, BinaryResponse } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
 const fileObject = {
@@ -14,8 +14,8 @@ const fileObject = {
 
 const publicUrl = "https://files-cdn.x.ai/ZsqeMtdcSYWPPHTQdxXDKQ/file_1.png";
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 describe("files.upload", () => {
@@ -143,7 +143,7 @@ describe("files.content", () => {
     expect(captured.requests[0]?.method).toBe("GET");
     expect(captured.requests[0]?.url).toBe("https://api.x.ai/v1/files/file_1/content");
     expect(captured.requests[0]?.headers.get("accept")).toBe("*/*");
-    expect(res).toBeInstanceOf(xAIBinaryResponse);
+    expect(res).toBeInstanceOf(BinaryResponse);
     expect(res.contentType).toBe("application/octet-stream");
     expect(res.http.requestId).toBe("req_test");
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
@@ -202,7 +202,7 @@ describe("files public URLs", () => {
 });
 
 describe("file response validation", () => {
-  const cases: Array<[string, (files: xAI["files"]) => Promise<unknown>, unknown]> = [
+  const cases: Array<[string, (files: SpaceXAI["files"]) => Promise<unknown>, unknown]> = [
     ["an upload without id", (files) => files.upload({ file: new Blob(["x"]), filename: "x.txt" }), { object: "file" }],
     ["a non-object file", (files) => files.get("file_1"), "not json"],
     ["a file with an empty id", (files) => files.get("file_1"), { ...fileObject, id: "" }],

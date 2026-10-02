@@ -1,6 +1,14 @@
 # Changelog
 
-All notable changes to the xAI TypeScript SDK will be documented in this file.
+All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
+
+## [0.2.0] - 2026-10-02
+
+### Changed
+
+- **Breaking:** Renamed the client class from `xAI` to `SpaceXAI`, and the `xAIResponse`, `xAIStream`, `xAIStreamEvent`, and `xAIBinaryResponse` types to `ModelResponse`, `ResponseStream`, `ResponseStreamEvent`, and `BinaryResponse`.
+- Client error messages start with `SpaceXAI:` instead of `xAI:`.
+- The README, package description, and doc comments say SpaceXAI.
 
 ## [0.1.0] - 2026-10-02
 

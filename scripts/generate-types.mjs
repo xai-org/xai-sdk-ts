@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates src/generated/types.ts from the official xAI HTTP OpenAPI spec.
+ * Generates src/generated/types.ts from the official SpaceXAI HTTP OpenAPI spec.
  * Default: https://docs.x.ai/openapi.json
  *
  * SSE event payload objects are not in that spec; those stay in src/types.ts.

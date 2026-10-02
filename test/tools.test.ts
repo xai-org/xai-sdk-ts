@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { xAI } from "../src/index.js";
+import { SpaceXAI } from "../src/index.js";
 import {
   codeExecution,
   collectionsSearch,
@@ -40,7 +40,7 @@ describe("tool helpers", () => {
 
   it("sends helper tools as they are", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const tools = [xSearch({ excluded_x_handles: ["spam"] }), codeExecution()];
     await client.responses.create({ ...createBody, tools });
     const body = (await captured.requests[0]?.json()) as { tools: unknown };

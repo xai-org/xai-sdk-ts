@@ -20,11 +20,11 @@ function reportedCostUsd(label, usage) {
   return usage.cost_usd;
 }
 
-const { xAI } = await import("../dist/index.js");
+const { SpaceXAI } = await import("../dist/index.js");
 const model = process.env.XAI_TEST_MODEL ?? "grok-4.6";
 const imageModel = process.env.XAI_TEST_IMAGE_MODEL ?? "grok-imagine-image";
 
-const client = new xAI({
+const client = new SpaceXAI({
   apiKey,
   maxRetries: 0,
   timeout: 120_000,

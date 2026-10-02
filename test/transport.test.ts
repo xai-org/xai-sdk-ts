@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APIError, TimeoutError, xAI, xAIResponse } from "../src/index.js";
+import { APIError, TimeoutError, SpaceXAI, ModelResponse } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch, sseResponse } from "./helpers.js";
 
 const created = { type: "response.created", response: { id: "resp_s", status: "in_progress", output: [] } };
@@ -23,11 +23,11 @@ function pausingSse(pauseMs: number): Response {
 describe("responses.create without stream", () => {
   it("streams under the hood and resolves to the final response", async () => {
     const { fetch, captured } = mockFetch(() => sseResponse([created, completed]));
-    const response = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const response = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     const body = (await captured.requests[0]?.json()) as { stream: boolean };
     expect(body.stream).toBe(true);
     expect(captured.requests[0]?.headers.get("accept")).toBe("text/event-stream");
-    expect(response).toBeInstanceOf(xAIResponse);
+    expect(response).toBeInstanceOf(ModelResponse);
     expect(response.toText()).toBe("Hello world");
     expect(response.usage.cost_usd).toBe(1.5);
     expect(response.http.requestId).toBe("req_test");
@@ -36,44 +36,44 @@ describe("responses.create without stream", () => {
 
   it("accepts a JSON response in place of the stream", async () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
-    const response = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const response = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(response.id).toBe("resp_123");
   });
 
   it("waits through silences longer than the client idle timeout", async () => {
     const { fetch } = mockFetch(() => pausingSse(60));
-    const client = new xAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 });
-    await expect(client.responses.create(createBody)).resolves.toBeInstanceOf(xAIResponse);
+    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 });
+    await expect(client.responses.create(createBody)).resolves.toBeInstanceOf(ModelResponse);
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(stream.done()).rejects.toBeInstanceOf(TimeoutError);
   });
 
   it("applies an idle timeout passed on the request", async () => {
     const { fetch } = mockFetch(() => pausingSse(60));
-    const client = new xAI({ apiKey: "k", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 });
     await expect(client.responses.create(createBody, { idleTimeout: 20 })).rejects.toBeInstanceOf(TimeoutError);
   });
 
   it("rejects with a mid-stream error event", async () => {
     const { fetch } = mockFetch(() => sseResponse([created, { type: "error", code: 529, message: "overloaded" }]));
-    const client = new xAI({ apiKey: "k", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 });
     const error = await client.responses.create(createBody).catch((err: unknown) => err);
     expect(APIError.is(error) && error.isOverloaded()).toBe(true);
   });
 
   it("captures the final response object when http.body is requested", async () => {
     const { fetch } = mockFetch(() => sseResponse([created, completed]));
-    const client = new xAI({ apiKey: "k", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 });
     const response = await client.responses.create(createBody, { http: { body: true } });
     expect(response.http.body).toEqual(completedResponse);
   });
 });
 
-describe("xAIResponse fields", () => {
+describe("ModelResponse fields", () => {
   it("copies documented fields and keeps the full API object in raw", async () => {
     const wire = { ...completedResponse, temperature: 0.2, field_added_later: 1 };
     const { fetch } = mockFetch(() => jsonResponse(wire));
-    const response = await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    const response = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       ...createBody,
       stream: false,
     });

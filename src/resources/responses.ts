@@ -1,18 +1,18 @@
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
 import { send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
-import { xAIResponse } from "../response.js";
-import { xAIStream } from "../stream.js";
+import { ModelResponse } from "../response.js";
+import { ResponseStream } from "../stream.js";
 import { PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type { CompactParams, CreateParams, RequestOpts } from "../types.js";
 import type { CompactResponse, DeletedResponse, InputItemList } from "../types.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 export class Responses {
   readonly inputItems: InputItems;
 
-  constructor(private readonly client: xAI) {
+  constructor(private readonly client: SpaceXAI) {
     this.inputItems = new InputItems(client);
   }
 
@@ -25,13 +25,13 @@ export class Responses {
    * Without `stream`, the response is streamed under the hood and this resolves to the final
    * response. `stream: false` sends a plain JSON request instead.
    */
-  create(body: CreateParams & { stream: true }, opts?: RequestOpts): Promise<xAIStream>;
-  create(body: CreateParams & { stream?: false }, opts?: RequestOpts): Promise<xAIResponse>;
-  create(body: CreateParams & { stream?: boolean }, opts?: RequestOpts): Promise<xAIResponse | xAIStream>;
+  create(body: CreateParams & { stream: true }, opts?: RequestOpts): Promise<ResponseStream>;
+  create(body: CreateParams & { stream?: false }, opts?: RequestOpts): Promise<ModelResponse>;
+  create(body: CreateParams & { stream?: boolean }, opts?: RequestOpts): Promise<ModelResponse | ResponseStream>;
   async create(
     body: CreateParams & { stream?: boolean },
     opts?: RequestOpts,
-  ): Promise<xAIResponse | xAIStream> {
+  ): Promise<ModelResponse | ResponseStream> {
     const input = await inlineBlobs(body.input, opts?.signal);
     const payload = applyCreateDefaults({ ...body, input });
     if (body.stream === undefined) return this.#streamToResponse(payload, opts);
@@ -44,17 +44,17 @@ export class Responses {
       opts,
     });
     if (stream) {
-      return new xAIStream({
+      return new ResponseStream({
         body: result.body,
         http: result.http,
         signal: opts?.signal,
       });
     }
-    return new xAIResponse(result.payload, result.http);
+    return new ModelResponse(result.payload, result.http);
   }
 
   /** Streaming keeps long requests alive where runtimes cap the wait for headers, such as Node at 5 minutes. */
-  async #streamToResponse(payload: Record<string, unknown>, opts?: RequestOpts): Promise<xAIResponse> {
+  async #streamToResponse(payload: Record<string, unknown>, opts?: RequestOpts): Promise<ModelResponse> {
     const result = await send(this.client, {
       method: "POST",
       path: "/responses",
@@ -64,8 +64,8 @@ export class Responses {
       // Reasoning can run silently for minutes, so only a per-request idleTimeout applies.
       opts: { ...opts, idleTimeout: opts?.idleTimeout ?? 0 },
     });
-    if (!result.body) return new xAIResponse(result.payload, result.http);
-    const response = await new xAIStream({ body: result.body, http: result.http, signal: opts?.signal }).done();
+    if (!result.body) return new ModelResponse(result.payload, result.http);
+    const response = await new ResponseStream({ body: result.body, http: result.http, signal: opts?.signal }).done();
     if (opts?.http?.body) response.http.body = response.raw;
     return response;
   }
@@ -91,13 +91,13 @@ export class Responses {
     return { ...(compacted as CompactResponse), http: result.http };
   }
 
-  async get(id: string, opts?: RequestOpts): Promise<xAIResponse> {
+  async get(id: string, opts?: RequestOpts): Promise<ModelResponse> {
     const result = await send(this.client, {
       method: "GET",
       path: `/responses/${encodeURIComponent(id)}`,
       opts,
     });
-    return new xAIResponse(result.payload, result.http);
+    return new ModelResponse(result.payload, result.http);
   }
 
   async delete(id: string, opts?: RequestOpts): Promise<DeletedResponse & { http: import("../types.js").HttpMeta }> {
@@ -120,7 +120,7 @@ export class Responses {
 }
 
 export class InputItems {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   list(
     id: string,

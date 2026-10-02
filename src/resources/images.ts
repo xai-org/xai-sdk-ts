@@ -4,7 +4,7 @@ import { inlineImageInputs } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
 import { requireRecord } from "./shared.js";
 import type { ImageEditParams, ImageGenerateParams, ImageResponse, RequestOpts } from "../types.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 function toImageResponse(result: SendResult): ImageResponse {
   const body = requireRecord(result.payload, result.http, "Image response");
@@ -22,7 +22,7 @@ function toImageResponse(result: SendResult): ImageResponse {
 }
 
 export class Images {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async generate(body: ImageGenerateParams, opts?: RequestOpts): Promise<ImageResponse> {
     const result = await send(this.client, {

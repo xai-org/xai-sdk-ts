@@ -4,8 +4,8 @@ import {
   type ClientSecretCreateParams,
   type CustomVoiceUpdateParams,
   type SpeechParams,
-  xAI,
-  xAIBinaryResponse,
+  SpaceXAI,
+  BinaryResponse,
 } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
@@ -32,8 +32,8 @@ const transcription = {
   ],
 };
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 function audioResponse(bytes: Uint8Array, contentType: string): Response {
@@ -51,7 +51,7 @@ describe("voice.speak", () => {
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00, 0xff]);
     const { fetch, captured } = mockFetch(() => audioResponse(mp3, "audio/mpeg"));
     const params = {
-      text: "Hello! [pause] Welcome to xAI.",
+      text: "Hello! [pause] Welcome to SpaceXAI.",
       language: "en",
       voice_id: "eve",
       output_format: { codec: "mp3", sample_rate: 44100, bit_rate: 192000 },
@@ -68,7 +68,7 @@ describe("voice.speak", () => {
     expect(request?.headers.get("accept")).toBe("*/*");
     expect(await request?.json()).toEqual(params);
 
-    expect(speech).toBeInstanceOf(xAIBinaryResponse);
+    expect(speech).toBeInstanceOf(BinaryResponse);
     expect(speech.contentType).toBe("audio/mpeg");
     expect(speech.http.requestId).toBe("req_test");
     expect(new Uint8Array(await speech.arrayBuffer())).toEqual(mp3);
@@ -304,7 +304,7 @@ describe("voice.custom", () => {
       "GET https://api.x.ai/v1/custom-voices/nlbqfwie/audio",
     );
     expect(request?.headers.get("accept")).toBe("*/*");
-    expect(audio).toBeInstanceOf(xAIBinaryResponse);
+    expect(audio).toBeInstanceOf(BinaryResponse);
     expect(audio.contentType).toBe("audio/wav");
     expect(new Uint8Array(await audio.arrayBuffer())).toEqual(wav);
   });

@@ -16,7 +16,7 @@ import type {
   HttpMeta,
   RequestOpts,
 } from "../types.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 const DEFAULT_WAIT_INTERVAL_MS = 5_000;
 const DEFAULT_WAIT_TIMEOUT_MS = 86_400_000;
@@ -45,7 +45,7 @@ async function toWireRequest(request: BatchRequest, signal?: AbortSignal): Promi
 export class Batches {
   readonly requests: BatchRequests;
 
-  constructor(private readonly client: xAI) {
+  constructor(private readonly client: SpaceXAI) {
     this.requests = new BatchRequests(client);
   }
 
@@ -154,7 +154,7 @@ export class Batches {
 }
 
 export class BatchRequests {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   /**
    * `responses` requests are sent like `responses.create()` bodies: `Blob` images are

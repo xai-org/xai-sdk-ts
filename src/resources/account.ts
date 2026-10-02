@@ -2,10 +2,10 @@ import { send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { requireRecord } from "./shared.js";
 import type { ApiKeyInfo, HttpMeta, RequestOpts } from "../types.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 export class Account {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async apiKey(opts?: RequestOpts): Promise<ApiKeyInfo & { http: HttpMeta }> {
     const result = await send(this.client, {

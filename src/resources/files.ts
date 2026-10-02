@@ -1,6 +1,6 @@
 import { send, type SendResult } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
-import { xAIBinaryResponse } from "../binary.js";
+import { BinaryResponse } from "../binary.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type {
@@ -16,7 +16,7 @@ import type {
   HttpMeta,
   RequestOpts,
 } from "../types.js";
-import type { xAI } from "../client.js";
+import type { SpaceXAI } from "../client.js";
 
 function toFileObject(result: SendResult): FileObject & { http: HttpMeta } {
   const body = requireRecord(result.payload, result.http, "File");
@@ -30,7 +30,7 @@ function toFileObject(result: SendResult): FileObject & { http: HttpMeta } {
 }
 
 export class Files {
-  constructor(private readonly client: xAI) {}
+  constructor(private readonly client: SpaceXAI) {}
 
   async upload(params: FileUploadParams, opts?: RequestOpts): Promise<FileObject & { http: HttpMeta }> {
     const form = new FormData();
@@ -100,7 +100,7 @@ export class Files {
     return { ...(body as DeletedFile), http: result.http };
   }
 
-  async content(id: string, query: FileContentParams = {}, opts?: RequestOpts): Promise<xAIBinaryResponse> {
+  async content(id: string, query: FileContentParams = {}, opts?: RequestOpts): Promise<BinaryResponse> {
     const result = await send(this.client, {
       method: "GET",
       path: `/files/${encodeURIComponent(id)}/content`,
@@ -108,7 +108,7 @@ export class Files {
       binary: true,
       opts,
     });
-    return new xAIBinaryResponse(result.body, result.http);
+    return new BinaryResponse(result.body, result.http);
   }
 
   async createPublicUrl(

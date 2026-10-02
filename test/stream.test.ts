@@ -6,8 +6,8 @@ import {
   TimeoutError,
   isFunctionCall,
   isImageGenerationCall,
-  xAI,
-  xAIResponse,
+  SpaceXAI,
+  ModelResponse,
 } from "../src/index.js";
 import { completedResponse, createBody, mockFetch, sseResponse, usageFixture } from "./helpers.js";
 
@@ -25,7 +25,7 @@ describe("responses.create stream", () => {
       },
     ];
     const { fetch } = mockFetch(() => sseResponse(events));
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     try {
@@ -52,7 +52,7 @@ describe("responses.create stream", () => {
     const { fetch } = mockFetch(() =>
       sseResponse([{ type: "response.completed", response: { ...completedResponse, usage } }]),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const { usage: mapped } = await stream.done();
     expect(mapped.cost_usd).toBe(1.5);
@@ -97,7 +97,7 @@ describe("responses.create stream", () => {
       },
     ];
     const { fetch } = mockFetch(() => sseResponse(events));
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const deltas: Array<string> = [];
     for await (const event of stream) {
@@ -133,7 +133,7 @@ describe("responses.create stream", () => {
         { type: "response.completed", response: { ...completedResponse, output: [call] } },
       ]),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({
       ...createBody,
       tools: [{ type: "image_generation" }],
@@ -159,7 +159,7 @@ describe("responses.create stream", () => {
         { type: "response.completed", response: completedResponse },
       ]),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     for await (const event of stream) types.push(event.type);
@@ -173,7 +173,7 @@ describe("responses.create stream", () => {
         { type: "error", code: 529, message: "overloaded" },
       ]),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const events = [];
     for await (const event of stream) events.push(event);
@@ -200,7 +200,7 @@ describe("responses.create stream", () => {
         },
       ]),
     );
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     let error: APIError | undefined;
     for await (const event of stream) {
@@ -230,7 +230,7 @@ describe("responses.create stream", () => {
           { headers: { "content-type": "text/event-stream", "x-request-id": "req_test" } },
         ),
     );
-    const client = new xAI({
+    const client = new SpaceXAI({
       apiKey: "test-key",
       fetch,
       maxRetries: 0,
@@ -263,7 +263,7 @@ describe("stream.on and stream.done", () => {
 
   async function streamOf(sse: Array<unknown>, init: { hang?: boolean } = {}) {
     const { fetch } = mockFetch(() => sseResponse(sse, init));
-    const client = new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
     return client.responses.create({ ...createBody, stream: true });
   }
 
@@ -272,7 +272,7 @@ describe("stream.on and stream.done", () => {
     const texts: Array<string> = [];
     const response = await stream.on("text", (text) => texts.push(text)).done();
     expect(texts).toEqual(["Hello", " world"]);
-    expect(response).toBeInstanceOf(xAIResponse);
+    expect(response).toBeInstanceOf(ModelResponse);
     expect(response.id).toBe("resp_123");
     expect(response.toText()).toBe("Hello world");
     expect(response.usage.cost_usd).toBe(1.5);
@@ -402,7 +402,7 @@ describe("stream.on and stream.done", () => {
     const texts: Array<string> = [];
     stream.on("text", (text) => texts.push(text));
     const types: Array<string> = [];
-    let pending: Promise<xAIResponse> | undefined;
+    let pending: Promise<ModelResponse> | undefined;
     for await (const event of stream) {
       pending ??= stream.done();
       types.push(event.type);

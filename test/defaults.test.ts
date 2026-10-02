@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { xAI } from "../src/index.js";
+import { SpaceXAI } from "../src/index.js";
 import { completedResponse, jsonResponse, mockFetch } from "./helpers.js";
 
 describe("store/include defaults", () => {
   it("defaults store to false and include to encrypted reasoning", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       model: "grok-4.6",
       input: "hi",
     });
@@ -21,7 +21,7 @@ describe("store/include defaults", () => {
 
   it("sends stream: false as a plain JSON request", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       model: "grok-4.6",
       input: "hi",
       stream: false,
@@ -33,7 +33,7 @@ describe("store/include defaults", () => {
 
   it("does not auto-include when store is true", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       model: "grok-4.6",
       input: "hi",
       store: true,
@@ -45,7 +45,7 @@ describe("store/include defaults", () => {
 
   it("merges encrypted reasoning into a caller include list when store is false", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new xAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       model: "grok-4.6",
       input: "hi",
       store: false,

@@ -6,7 +6,7 @@ import {
   type InputItem,
   NotFoundError,
   TimeoutError,
-  xAI,
+  SpaceXAI,
 } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
@@ -36,8 +36,8 @@ const chatCompletion = {
   system_fingerprint: "fp_1944a19e1f",
 };
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 async function jsonBody(request: Request | undefined): Promise<Record<string, unknown>> {
@@ -338,7 +338,7 @@ describe("batches.requests", () => {
 });
 
 describe("batch response validation", () => {
-  it.each<[string, (c: xAI) => Promise<unknown>, unknown, string]>([
+  it.each<[string, (c: SpaceXAI) => Promise<unknown>, unknown, string]>([
     [
       "a non-object batch",
       (c) => c.batches.create({ name: "My New Batch" }),

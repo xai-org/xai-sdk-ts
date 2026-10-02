@@ -1,9 +1,9 @@
 <div align="center">
   <a href="https://x.ai">
-    <img src="https://avatars.githubusercontent.com/u/130314967?s=200&v=4" alt="xAI" width="96" />
+    <img src="https://avatars.githubusercontent.com/u/130314967?s=200&v=4" alt="SpaceXAI" width="96" />
   </a>
-  <h1>xAI TypeScript SDK</h1>
-  <p>The official TypeScript SDK for the xAI API</p>
+  <h1>SpaceXAI TypeScript SDK</h1>
+  <p>The official TypeScript SDK for the SpaceXAI API</p>
   <p>
     <a href="./LICENSE">
       <img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0 license" />
@@ -19,14 +19,14 @@
   </p>
 </div>
 
-Use Grok from TypeScript with a typed, ESM client built on the xAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image and video generation, file uploads, batch processing, text to speech and transcription, multi-turn conversations, and access to usage and HTTP metadata.
+Use Grok from TypeScript with a typed, ESM client built on the SpaceXAI REST API. The SDK has no runtime dependencies and includes streaming, structured output, function tools, image input, image and video generation, file uploads, batch processing, text to speech and transcription, multi-turn conversations, and access to usage and HTTP metadata.
 
 > **Experimental.** This SDK is in early development. It currently covers the Responses API, image and video generation, the Files, Batch, and Voice APIs, tokenization, and model and account lookup, and its interfaces may change between releases before 1.0. Pin an exact version and read the [changelog](./CHANGELOG.md) when upgrading. Feedback and bug reports are welcome in [issues](https://github.com/xai-org/xai-sdk-ts/issues).
 
 ## Requirements
 
 - Node.js 22.13 or later
-- An [xAI API key](https://console.x.ai)
+- A [SpaceXAI API key](https://console.x.ai)
 - An ESM project
 
 ## Installation
@@ -50,9 +50,9 @@ export XAI_API_KEY="your-api-key"
 ```
 
 ```ts
-import { xAI } from "@xai-official/sdk";
+import { SpaceXAI } from "@xai-official/sdk";
 
-const client = new xAI();
+const client = new SpaceXAI();
 
 const response = await client.responses.create({
   model: "grok-4.7",
@@ -87,9 +87,9 @@ console.log(`\n${response.usage.total_tokens} tokens`);
 Besides `"text"`, `on()` has helper events for the rest of a response:
 
 - `"reasoning"` for each chunk of reasoning text or reasoning summary
-- `"tool_call"` for each tool call once its arguments are complete, whether your code or xAI runs it. Check `call.type` to tell them apart
+- `"tool_call"` for each tool call once its arguments are complete, whether your code or SpaceXAI runs it. Check `call.type` to tell them apart
 - `"client_tool_call"` for each call that your code runs: your function tools and shell commands
-- `"server_tool_call"` for each call to a tool that xAI runs, such as web search or code execution
+- `"server_tool_call"` for each call to a tool that SpaceXAI runs, such as web search or code execution
 - `"image"` for each finished image generation call, with the base64 image in `result`
 - `"citation"` for each URL citation in the answer
 
@@ -128,9 +128,9 @@ Responses are not stored by default. Use `toInput()` to carry the model output, 
 
 ```ts
 import { randomUUID } from "node:crypto";
-import { type InputItem, xAI } from "@xai-official/sdk";
+import { type InputItem, SpaceXAI } from "@xai-official/sdk";
 
-const client = new xAI();
+const client = new SpaceXAI();
 const promptCacheKey = `conversation:${randomUUID()}`;
 const input: Array<InputItem> = [
   { role: "user", content: "My name is Ada. Remember it." },
@@ -286,9 +286,9 @@ console.log(suggestion);
 Describe functions with JSON Schema, run the requested function in your application, then return its output to the model:
 
 ```ts
-import { type InputItem, type Tool, isFunctionCall, xAI } from "@xai-official/sdk";
+import { type InputItem, type Tool, isFunctionCall, SpaceXAI } from "@xai-official/sdk";
 
-const client = new xAI();
+const client = new SpaceXAI();
 const prompt = "What is the weather in San Francisco?";
 const input: Array<InputItem> = [{ role: "user", content: prompt }];
 const getWeatherTool: Tool = {
@@ -349,9 +349,9 @@ Treat function names and arguments as untrusted input. Only dispatch functions y
 To let the model call tools until it has an answer, run a loop. Stream a turn, run each function call as soon as it finishes streaming, then send the outputs back along with the model's output. Stop when a turn makes no function calls, and cap the number of turns so a model that keeps calling tools can't loop forever. This reuses `getWeatherTool` and `getWeather` from the example above:
 
 ```ts
-import { type FunctionToolCall, type InputItem, type Tool, xAI } from "@xai-official/sdk";
+import { type FunctionToolCall, type InputItem, type Tool, SpaceXAI } from "@xai-official/sdk";
 
-const client = new xAI();
+const client = new SpaceXAI();
 const tools: Array<Tool> = [getWeatherTool];
 const handlers: Record<string, (args: unknown) => Promise<unknown>> = {
   get_weather: getWeather,
@@ -406,9 +406,9 @@ With the `shell` tool, the model writes shell commands and your application runs
 
 ```ts
 import { exec } from "node:child_process";
-import { xAI } from "@xai-official/sdk";
+import { SpaceXAI } from "@xai-official/sdk";
 
-const client = new xAI();
+const client = new SpaceXAI();
 
 const stream = await client.responses.create({
   model: "grok-4.7",
@@ -452,7 +452,7 @@ Asked to write release notes, the model reads `./skills/release-notes/SKILL.md`,
 
 ## Built-in tools
 
-Besides your own functions, the API has built-in tools. Create them with the helpers from `@xai-official/sdk/tools`, which check each tool's options as you type. xAI runs these tools and includes their results in the response:
+Besides your own functions, the API has built-in tools. Create them with the helpers from `@xai-official/sdk/tools`, which check each tool's options as you type. SpaceXAI runs these tools and includes their results in the response:
 
 - `webSearch()` (`web_search`) searches the web. Options include `allowed_domains`, `excluded_domains`, `user_location`, and `search_context_size`.
 - `xSearch()` (`x_search`) searches posts on X. Options include `allowed_x_handles`, `excluded_x_handles`, `from_date`, and `to_date`.
@@ -464,17 +464,17 @@ Besides your own functions, the API has built-in tools. Create them with the hel
 
 Two kinds of tools run in your application instead: `function` for your own functions, as shown in [Tools](#tools), and `shell`, where the model writes shell commands for your application to run, as shown in [Shell commands](#shell-commands). When you stream, calls to both arrive through the `client_tool_call` listener.
 
-The helpers return plain tool objects, so you can also write `{ type: "web_search" }` yourself. `Tool` autocompletes the known types and accepts any other `type`, such as a tool released after this SDK version, but it doesn't check options the way the helpers do. See the [xAI documentation](https://docs.x.ai) for each tool's options.
+The helpers return plain tool objects, so you can also write `{ type: "web_search" }` yourself. `Tool` autocompletes the known types and accepts any other `type`, such as a tool released after this SDK version, but it doesn't check options the way the helpers do. See the [SpaceXAI documentation](https://docs.x.ai) for each tool's options.
 
 ### Web search
 
 Add the web search tool when a prompt needs current information:
 
 ```ts
-import { xAI } from "@xai-official/sdk";
+import { SpaceXAI } from "@xai-official/sdk";
 import { webSearch } from "@xai-official/sdk/tools";
 
-const client = new xAI();
+const client = new SpaceXAI();
 
 const response = await client.responses.create({
   model: "grok-4.7",
@@ -495,7 +495,7 @@ import { xSearch } from "@xai-official/sdk/tools";
 
 const response = await client.responses.create({
   model: "grok-4.7",
-  input: "What has xAI announced on X this month?",
+  input: "What has SpaceXAI announced on X this month?",
   tools: [xSearch({ allowed_x_handles: ["xai"], from_date: "2026-09-01" })],
 });
 ```
@@ -544,7 +544,7 @@ const response = await client.responses.create({
 
 ### Remote MCP servers
 
-Give the model the tools of a remote MCP server. xAI connects to the server and calls its tools during the response:
+Give the model the tools of a remote MCP server. SpaceXAI connects to the server and calls its tools during the response:
 
 ```ts
 import { mcp } from "@xai-official/sdk/tools";
@@ -564,10 +564,10 @@ Add the image generation tool to let the model create or edit images as one step
 
 ```ts
 import { writeFile } from "node:fs/promises";
-import { isImageGenerationCall, xAI } from "@xai-official/sdk";
+import { isImageGenerationCall, SpaceXAI } from "@xai-official/sdk";
 import { imageGeneration } from "@xai-official/sdk/tools";
 
-const client = new xAI();
+const client = new SpaceXAI();
 
 const response = await client.responses.create({
   model: "grok-4.7",
@@ -597,7 +597,7 @@ Every completed response provides:
 - `response.parsed` for non-throwing JSON parsing
 - `response.output` for typed output items
 - `response.usage` for token counts, server-side tool use, and cost when available
-- `response.http` for the HTTP status, headers, xAI request ID, and client request ID
+- `response.http` for the HTTP status, headers, SpaceXAI request ID, and client request ID
 - `response.raw` for the response object as the API sent it, including fields this SDK doesn't know yet
 
 Use the exported type guards when inspecting output items:
@@ -818,7 +818,7 @@ await client.files.revokePublicUrl(file.id);
 await client.files.delete(file.id);
 ```
 
-`list()` returns the newest files first and fetches further pages as the loop needs them. `content()` returns an `xAIBinaryResponse`: stream its `body` or read it with `bytes()`, `text()`, or `blob()`.
+`list()` returns the newest files first and fetches further pages as the loop needs them. `content()` returns an `BinaryResponse`: stream its `body` or read it with `bytes()`, `text()`, or `blob()`.
 
 Anyone with a public URL can download the file without an API key. Only images, videos, and PDFs up to 50 MiB can be made public. A file has at most one public URL, so calling `createPublicUrl()` again returns the existing URL and updates its expiry if you pass a new `expires_after`. Without `expires_after`, the URL lasts as long as the file unless you revoke it. After revoking, copies already cached by the CDN can still be served briefly.
 
@@ -870,7 +870,7 @@ for await (const { batch_request_id, batch_result } of client.batches.results(ba
 
 ## Voice
 
-Convert text to speech with `client.voice.speak()`. The audio comes back as an `xAIBinaryResponse`, encoded as MP3 unless you set `output_format`:
+Convert text to speech with `client.voice.speak()`. The audio comes back as an `BinaryResponse`, encoded as MP3 unless you set `output_format`:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -983,7 +983,7 @@ const modelInfo = await client.models.get(model);
 console.log(modelInfo);
 ```
 
-`KnownModelId` is generated from the [xAI model documentation](https://docs.x.ai/developers/models). Use it when you want strict validation against the models known to this SDK release.
+`KnownModelId` is generated from the [SpaceXAI model documentation](https://docs.x.ai/developers/models). Use it when you want strict validation against the models known to this SDK release.
 
 Image generation models have their own catalog, which includes modalities, aliases, and pricing. `ImageModelId` and `KnownImageModelId` work the same way as the text model types:
 
@@ -1059,7 +1059,7 @@ This works for `files.list()`, `batches.list()`, `batches.results()`, `batches.r
 Configure defaults on the client:
 
 ```ts
-const client = new xAI({
+const client = new SpaceXAI({
   timeout: 60_000,
   idleTimeout: 30_000,
   maxRetries: 2,
@@ -1132,7 +1132,7 @@ XAI_DEBUG=1 node app.js
 
 Authentication headers and common credential fields are redacted. Request bodies are always omitted because prompts and tool outputs may contain sensitive data.
 
-Structured API failures expose `error.type`, `error.code`, and `error.param` when the server returns them. The xAI request ID is also available at `response.http.requestId` and `error.requestId`. Include it when reporting an API problem.
+Structured API failures expose `error.type`, `error.code`, and `error.param` when the server returns them. The SpaceXAI request ID is also available at `response.http.requestId` and `error.requestId`. Include it when reporting an API problem.
 
 Every request also sends an `x-client-request-id` header with a UUID generated by the SDK. The ID stays the same across retries and is available at `response.http.clientRequestId` and `error.clientRequestId`, even when a request fails before the API responds. To use your own ID, set `x-client-request-id` in the request `headers`.
 

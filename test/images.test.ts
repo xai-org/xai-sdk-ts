@@ -5,7 +5,7 @@ import {
   type ImageEditParams,
   type ImageGenerateParams,
   isImageGenerationCall,
-  xAI,
+  SpaceXAI,
 } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch } from "./helpers.js";
 
@@ -36,8 +36,8 @@ const imageModel = {
   aliases: [],
 };
 
-function client(fetch: typeof globalThis.fetch): xAI {
-  return new xAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXAI {
+  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 async function jsonBody(request: Request | undefined): Promise<Record<string, unknown>> {

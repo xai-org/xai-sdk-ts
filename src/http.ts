@@ -25,7 +25,7 @@ import {
   withClientRequestId,
 } from "./errors.js";
 import type { HttpMeta, RequestOpts } from "./types.js";
-import type { xAI } from "./client.js";
+import type { SpaceXAI } from "./client.js";
 
 export function joinURL(base: string, path: string): string {
   const b = base.replace(/\/+$/, "");
@@ -141,7 +141,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-function callerHeaders(client: xAI, opts: RequestOpts | undefined): Headers {
+function callerHeaders(client: SpaceXAI, opts: RequestOpts | undefined): Headers {
   const headers = new Headers(client.defaultHeaders);
   if (opts?.headers) {
     new Headers(opts.headers).forEach((v, k) => headers.set(k, v));
@@ -149,12 +149,12 @@ function callerHeaders(client: xAI, opts: RequestOpts | undefined): Headers {
   return headers;
 }
 
-function clientRequestIdFor(client: xAI, opts: RequestOpts | undefined): string {
+function clientRequestIdFor(client: SpaceXAI, opts: RequestOpts | undefined): string {
   return callerHeaders(client, opts).get(CLIENT_REQUEST_ID_HEADER) ?? crypto.randomUUID();
 }
 
 function buildHeaders(
-  client: xAI,
+  client: SpaceXAI,
   opts: RequestOpts | undefined,
   accept: string,
   jsonBody: boolean,
@@ -283,7 +283,7 @@ export type SendResult = {
   sawByte: boolean;
 };
 
-export async function send(client: xAI, req: InternalRequest): Promise<SendResult> {
+export async function send(client: SpaceXAI, req: InternalRequest): Promise<SendResult> {
   const clientRequestId = clientRequestIdFor(client, req.opts);
   try {
     return await sendWithRetries(client, req, clientRequestId);
@@ -293,7 +293,7 @@ export async function send(client: xAI, req: InternalRequest): Promise<SendResul
 }
 
 async function sendWithRetries(
-  client: xAI,
+  client: SpaceXAI,
   req: InternalRequest,
   clientRequestId: string,
 ): Promise<SendResult> {

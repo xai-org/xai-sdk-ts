@@ -1,9 +1,9 @@
-export { xAI } from "./client.js";
+export { SpaceXAI } from "./client.js";
 export { SDK_VERSION } from "./version.js";
 export { SDK_USER_AGENT } from "./constants.js";
-export { xAIResponse } from "./response.js";
-export { xAIStream } from "./stream.js";
-export { xAIBinaryResponse } from "./binary.js";
+export { ModelResponse } from "./response.js";
+export { ResponseStream } from "./stream.js";
+export { BinaryResponse } from "./binary.js";
 export {
   APIError,
   APIConnectionError,
@@ -124,5 +124,5 @@ export type {
   VideoWaitOptions,
   Voice,
   VoiceList,
-  xAIStreamEvent,
+  ResponseStreamEvent,
 } from "./types.js";
