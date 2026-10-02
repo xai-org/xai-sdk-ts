@@ -1,6 +1,6 @@
 {
   "name": "@xai-official/sdk",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0",
   "description": "The official TypeScript SDK for the xAI API",
   "keywords": [
     "xai",
@@ -45,8 +45,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/",
-    "tag": "next"
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "generate": "node scripts/generate-types.mjs",

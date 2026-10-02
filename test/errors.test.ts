@@ -129,7 +129,6 @@ describe("typed errors", () => {
     expect(pkg.publishConfig).toEqual({
       access: "public",
       registry: "https://registry.npmjs.org/",
-      tag: "next",
     });
   });
 });

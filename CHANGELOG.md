@@ -2,7 +2,7 @@
 
 All notable changes to the xAI TypeScript SDK will be documented in this file.
 
-## [Unreleased]
+## [0.1.0] - 2026-10-02
 
 Initial public release.
 
