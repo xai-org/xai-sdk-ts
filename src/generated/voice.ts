@@ -6,7 +6,7 @@
  * - https://docs.x.ai/developers/model-capabilities/audio/speech-to-text.md
  * - https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech.md
  */
-export type InlineSpeechTags = [
+export const INLINE_SPEECH_TAGS = [
   "pause",
   "long-pause",
   "hum-tune",
@@ -21,9 +21,9 @@ export type InlineSpeechTags = [
   "inhale",
   "exhale",
   "sigh",
-];
+] as const;
 
-export type WrappingSpeechTags = [
+export const WRAPPING_SPEECH_TAGS = [
   "soft",
   "whisper",
   "loud",
@@ -36,7 +36,11 @@ export type WrappingSpeechTags = [
   "sing-song",
   "singing",
   "emphasis",
-];
+] as const;
+
+export type InlineSpeechTags = [...typeof INLINE_SPEECH_TAGS];
+
+export type WrappingSpeechTags = [...typeof WRAPPING_SPEECH_TAGS];
 
 export type KnownVoiceId =
   | "altair"

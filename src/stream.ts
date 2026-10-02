@@ -1,6 +1,13 @@
-import { isKnownStreamEventType, isServerToolCallType } from "./constants.js";
+import {
+  RETRYABLE_STATUS,
+  SERVER_ERROR_RETRY_STATUS,
+  isKnownStreamEventType,
+  isServerToolCallType,
+} from "./constants.js";
+import { retryDelayMs, sleep, type RetryBudget } from "./http.js";
 import {
   AbortError,
+  APIConnectionError,
   APIProtocolError,
   TimeoutError,
   errorFromUnknown,
@@ -8,6 +15,7 @@ import {
   withClientRequestId,
   type APIError,
 } from "./errors.js";
+import { parsePartialJson } from "./partial-json.js";
 import { parseSse } from "./sse.js";
 import { isImageGenerationCall, isMessage } from "./porcelain.js";
 import { ModelResponse } from "./response.js";
@@ -56,6 +64,7 @@ type HelperListeners = {
   server_tool_call: (call: ServerToolCall) => void;
   image: (image: ImageGenerationCall) => void;
   citation: (citation: UrlCitation) => void;
+  json: (value: unknown) => void;
 };
 
 type StreamListeners = HelperListeners & {
@@ -70,17 +79,36 @@ const HELPER_EVENTS: Record<keyof HelperListeners, true> = {
   server_tool_call: true,
   image: true,
   citation: true,
+  json: true,
 };
 
-export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
-  readonly http: HttpMeta;
+/** Sends the request again when a stream fails before any output, for `retryBeforeOutput`. */
+export type StreamRetry = {
+  resend: () => Promise<{ body: ReadableStream<Uint8Array> | null; http: HttpMeta }>;
+  /** Shared with the HTTP retries of every request in the call. */
+  budget: RetryBudget;
+};
 
+/** Events the API sends before any output. Retrying an attempt that only sent these is invisible to the caller. */
+function isLifecycleEvent(event: ResponseStreamEvent): boolean {
+  return event.type === "ping" || event.type === "response.created" || event.type === "response.in_progress";
+}
+
+function isRetryableBeforeOutput(error: APIError): boolean {
+  if (error instanceof APIConnectionError) return true;
+  return error.status !== undefined && (RETRYABLE_STATUS.has(error.status) || SERVER_ERROR_RETRY_STATUS.has(error.status));
+}
+
+export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
+  #http: HttpMeta;
   #body: ReadableStream<Uint8Array> | null;
   #closed = false;
   #consumed = false;
   #closeController = new AbortController();
   #requestId: string | null;
   #signal: AbortSignal | undefined;
+  #retry: StreamRetry | undefined;
+  #jsonText: string | undefined;
   #listeners = new Map<string, Array<(value: never) => void>>();
   #final: Record<string, unknown> | undefined;
   #error: APIError | undefined;
@@ -91,13 +119,23 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
     body: ReadableStream<Uint8Array> | null;
     http: HttpMeta;
     signal?: AbortSignal;
+    /** The request asked for JSON output, so text deltas also feed the `"json"` helper event. */
+    json?: boolean;
+    retry?: StreamRetry;
   }) {
-    this.http = init.http;
+    this.#http = init.http;
     this.#body = init.body;
     this.#requestId = init.http.requestId;
     this.#signal = init.signal;
+    this.#retry = init.retry;
+    this.#jsonText = init.json ? "" : undefined;
     // Keeps an iteration error from becoming an unhandled rejection when done() is never called.
     this.#ended.promise.catch(() => {});
+  }
+
+  /** HTTP metadata of the request whose stream is being read, which changes if `retryBeforeOutput` sends it again. */
+  get http(): HttpMeta {
+    return this.#http;
   }
 
   /**
@@ -176,6 +214,7 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
     switch (event.type) {
       case "response.output_text.delta":
         this.#emit("text", event.delta);
+        this.#emitJson(event.delta);
         break;
       case "response.reasoning_text.delta":
       case "response.reasoning_summary_text.delta":
@@ -191,6 +230,14 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
       default:
         break;
     }
+  }
+
+  #emitJson(delta: string): void {
+    if (this.#jsonText === undefined) return;
+    this.#jsonText += delta;
+    if (!this.#listeners.has("json")) return;
+    const value = parsePartialJson(this.#jsonText);
+    if (value !== undefined) this.#emit("json", value);
   }
 
   async #drain(): Promise<void> {
@@ -217,12 +264,16 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
   async *#events(): AsyncGenerator<ResponseStreamEvent> {
     if (!this.#body) return;
     try {
-      for await (const raw of parseSse(this.#body, {
-        closeSignal: this.#closeController.signal,
-      })) {
-        const event = this.#normalize(raw);
-        this.#apply(event);
-        yield event;
+      while (this.#body) {
+        const retry = this.#retry?.budget.canRetry ? this.#retry : undefined;
+        const failure = yield* this.#attempt(this.#body, retry !== undefined);
+        if (!failure || !retry) break;
+        await sleep(retryDelayMs(retry.budget.spend(), null, failure.status), this.#signal);
+        if (this.#closed) break;
+        const next = await retry.resend();
+        this.#body = next.body;
+        this.#http = next.http;
+        this.#requestId = next.http.requestId;
       }
       if (!this.#closed && !this.#final && !this.#error) {
         throw new APIProtocolError("Stream ended without a terminal response event", {
@@ -248,6 +299,45 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
     } finally {
       await this.close();
     }
+  }
+
+  /**
+   * Yields the events of one response body. With `canRetry`, events before the first output are held back,
+   * and a retryable failure before any output is returned instead of thrown, so the retry doesn't show.
+   */
+  async *#attempt(
+    body: ReadableStream<Uint8Array>,
+    canRetry: boolean,
+  ): AsyncGenerator<ResponseStreamEvent, APIError | undefined> {
+    const held: Array<ResponseStreamEvent> = [];
+    let holding = canRetry;
+    try {
+      for await (const raw of parseSse(body, { closeSignal: this.#closeController.signal })) {
+        const event = this.#normalize(raw);
+        if (holding) {
+          if (isLifecycleEvent(event)) {
+            held.push(event);
+            continue;
+          }
+          if (event.type === "error" && event.error && isRetryableBeforeOutput(event.error)) return event.error;
+          holding = false;
+          for (const early of held) {
+            this.#apply(early);
+            yield early;
+          }
+        }
+        this.#apply(event);
+        yield event;
+      }
+    } catch (err) {
+      const error = errorFromUnknown(err, this.#requestId);
+      if (holding && !this.#closed && !this.#signal?.aborted && isRetryableBeforeOutput(error)) return error;
+      throw err;
+    }
+    if (holding && !this.#closed) {
+      return new APIConnectionError("Stream ended before any output", { requestId: this.#requestId });
+    }
+    return undefined;
   }
 
   #normalize(raw: unknown): ResponseStreamEvent {

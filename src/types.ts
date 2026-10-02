@@ -99,6 +99,25 @@ export type CreateParams = Omit<
   store?: boolean | null;
 };
 
+/** A [Standard Schema](https://standardschema.dev) validator, such as a Zod, Valibot, or ArkType schema. */
+export type StandardSchema<Output = unknown> = {
+  readonly "~standard": {
+    readonly version: 1;
+    readonly vendor: string;
+    readonly validate: (value: unknown) => StandardSchemaResult<Output> | Promise<StandardSchemaResult<Output>>;
+    readonly types?: { readonly input: unknown; readonly output: Output } | undefined;
+  };
+};
+
+export type StandardSchemaIssue = {
+  readonly message: string;
+  readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined;
+};
+
+type StandardSchemaResult<Output> =
+  | { readonly value: Output; readonly issues?: undefined }
+  | { readonly issues: ReadonlyArray<StandardSchemaIssue> };
+
 export type CompactParams = Omit<Schema["CompactRequest"], "input" | "model"> & {
   model: ModelId;
   input: string | Array<InputItem>;
@@ -481,8 +500,15 @@ export type ClientOptions = {
   idleTimeout?: number;
   /** Maximum buffered JSON response size. Defaults to 32 MiB. */
   maxResponseBodyBytes?: number;
-  /** Number of retries. Creates retry only explicit 429 responses. */
+  /** Number of retries. Creates retry only explicit 429 responses, unless `retryBeforeOutput` is set. */
   maxRetries?: number;
+  /**
+   * Also retry a streamed `responses.create()`, including one without `stream`, when it fails before the
+   * model produces any output: a 5xx status, a dropped connection, or a stream error such as a 503 right
+   * after `response.created`. All retries of the call share `maxRetries`. Each retry starts a new response,
+   * and the failed attempt's input tokens may still be billed. Defaults to false.
+   */
+  retryBeforeOutput?: boolean;
   defaultHeaders?: Record<string, string>;
   onRequest?: RequestHook;
   onResponse?: ResponseHook;
@@ -500,6 +526,8 @@ export type RequestOpts = {
   maxResponseBodyBytes?: number;
   /** Retry-count override. */
   maxRetries?: number;
+  /** `retryBeforeOutput` override. */
+  retryBeforeOutput?: boolean;
   headers?: RequestHeaders;
   http?: { body?: boolean };
 };

@@ -35,6 +35,9 @@ importers:
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@22.15.29)(@vitest/coverage-v8@4.1.11)(vite@7.3.6(@types/node@22.15.29)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
 packages:
 
@@ -1215,6 +1218,9 @@ packages:
     resolution: {integrity: sha512-Nt9ZJjXTv5R8MHbqby/wXQ6Gi0Bb3TcYZkR1bzuL4yB2OxWPkXknz513gEF0GoA6tn00UpbPvERW8rzCuWCA6w==}
     engines: {node: '>=10'}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
 snapshots:
 
   '@andrewbranch/untar.js@1.0.4': {}
@@ -2146,3 +2152,5 @@ snapshots:
       string-width: 4.2.3
       y18n: 5.0.8
       yargs-parser: 20.2.9
+
+  zod@4.6.5: {}

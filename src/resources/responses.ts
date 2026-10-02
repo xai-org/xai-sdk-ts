@@ -1,13 +1,19 @@
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
-import { send } from "../http.js";
+import { CLIENT_REQUEST_ID_HEADER } from "../constants.js";
+import { RetryBudget, send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { ModelResponse } from "../response.js";
-import { ResponseStream } from "../stream.js";
+import { ResponseStream, type StreamRetry } from "../stream.js";
 import { PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
-import type { CompactParams, CreateParams, RequestOpts } from "../types.js";
+import type { CompactParams, CreateParams, HttpMeta, RequestOpts } from "../types.js";
 import type { CompactResponse, DeletedResponse, InputItemList } from "../types.js";
 import type { SpaceXAI } from "../client.js";
+
+function wantsJson(body: CreateParams): boolean {
+  const type = body.text?.format?.type;
+  return type === "json_schema" || type === "json_object";
+}
 
 export class Responses {
   readonly inputItems: InputItems;
@@ -36,11 +42,15 @@ export class Responses {
     const payload = applyCreateDefaults({ ...body, input });
     if (body.stream === undefined) return this.#streamToResponse(payload, opts);
     const stream = body.stream;
+    // A 5xx on a plain JSON create can arrive after the model finished, so only streams retry them.
+    const budget = stream ? this.#retryBudget(opts) : undefined;
     const result = await send(this.client, {
       method: "POST",
       path: "/responses",
       body: payload,
       stream,
+      retryServerErrors: budget !== undefined,
+      retryBudget: budget,
       opts,
     });
     if (stream) {
@@ -48,6 +58,8 @@ export class Responses {
         body: result.body,
         http: result.http,
         signal: opts?.signal,
+        json: wantsJson(body),
+        retry: budget && this.#streamRetry(payload, opts, result.http, budget),
       });
     }
     return new ModelResponse(result.payload, result.http);
@@ -55,19 +67,60 @@ export class Responses {
 
   /** Streaming keeps long requests alive where runtimes cap the wait for headers, such as Node at 5 minutes. */
   async #streamToResponse(payload: Record<string, unknown>, opts?: RequestOpts): Promise<ModelResponse> {
+    // Reasoning can run silently for minutes, so only a per-request idleTimeout applies.
+    const streamOpts = { ...opts, idleTimeout: opts?.idleTimeout ?? 0 };
+    const budget = this.#retryBudget(opts);
     const result = await send(this.client, {
       method: "POST",
       path: "/responses",
       body: { ...payload, stream: true },
       stream: true,
       acceptJson: true,
-      // Reasoning can run silently for minutes, so only a per-request idleTimeout applies.
-      opts: { ...opts, idleTimeout: opts?.idleTimeout ?? 0 },
+      retryServerErrors: budget !== undefined,
+      retryBudget: budget,
+      opts: streamOpts,
     });
     if (!result.body) return new ModelResponse(result.payload, result.http);
-    const response = await new ResponseStream({ body: result.body, http: result.http, signal: opts?.signal }).done();
+    const response = await new ResponseStream({
+      body: result.body,
+      http: result.http,
+      signal: opts?.signal,
+      retry: budget && this.#streamRetry(payload, streamOpts, result.http, budget),
+    }).done();
     if (opts?.http?.body) response.http.body = response.raw;
     return response;
+  }
+
+  /** For `retryBeforeOutput`, one budget covers a call's first request, its HTTP retries, and every resend. */
+  #retryBudget(opts: RequestOpts | undefined): RetryBudget | undefined {
+    if (!(opts?.retryBeforeOutput ?? this.client.retryBeforeOutput)) return undefined;
+    return new RetryBudget(opts?.maxRetries ?? this.client.maxRetries);
+  }
+
+  /** Resends with the first attempt's `x-client-request-id`, so every attempt carries the same ID. */
+  #streamRetry(
+    payload: Record<string, unknown>,
+    opts: RequestOpts | undefined,
+    http: HttpMeta,
+    budget: RetryBudget,
+  ): StreamRetry {
+    const headers = new Headers(opts?.headers);
+    headers.set(CLIENT_REQUEST_ID_HEADER, http.clientRequestId);
+    return {
+      budget,
+      resend: async () => {
+        const result = await send(this.client, {
+          method: "POST",
+          path: "/responses",
+          body: { ...payload, stream: true },
+          stream: true,
+          retryServerErrors: true,
+          retryBudget: budget,
+          opts: { ...opts, headers },
+        });
+        return { body: result.body, http: result.http };
+      },
+    };
   }
 
   async compact(

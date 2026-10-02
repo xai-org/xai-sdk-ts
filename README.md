@@ -82,7 +82,9 @@ const response = await stream
 console.log(`\n${response.usage.total_tokens} tokens`);
 ```
 
-`done()` resolves to the same response object a non-streamed request returns. It rejects if the stream fails or closes before the response completes.
+`done()` resolves to the same response object a non-streamed request returns. It rejects if the stream fails or closes before the response completes. An error partway through a stream, such as `Service temporarily unavailable`, ends the response and isn't retried, because the model may already have produced output. That also applies to `responses.create()` without `stream`, which streams under the hood. To retry failures that happen before any output, set [`retryBeforeOutput`](#timeouts-retries-and-cancellation).
+
+Reasoning models think before they answer, and at the default effort a long answer can take minutes to start. For text that streams to a UI, set `reasoning: { effort: "low" }`, or show `"reasoning"` events while the model thinks.
 
 Besides `"text"`, `on()` has helper events for the rest of a response:
 
@@ -92,6 +94,7 @@ Besides `"text"`, `on()` has helper events for the rest of a response:
 - `"server_tool_call"` for each call to a tool that SpaceXAI runs, such as web search or code execution
 - `"image"` for each finished image generation call, with the base64 image in `result`
 - `"citation"` for each URL citation in the answer
+- `"json"` for structured output: the output parsed so far, each time more text arrives. See [Streaming structured output](#streaming-structured-output)
 
 Each tool call fires once, when its arguments are complete. For your function tools, that's when to run the function, since nothing has run it yet. To show that a call has started before its arguments arrive, listen for `"response.output_item.added"`.
 
@@ -280,6 +283,110 @@ console.log(suggestion);
 ```
 
 `toJson()` returns `unknown`. Validate the result before using it at a trust boundary. The non-throwing `response.parsed` getter returns `null` when the output is incomplete or is not valid JSON.
+
+To validate and type the result in one step, pass a [Standard Schema](https://standardschema.dev) validator. `toJson(schema)` returns the schema's output, with any coercions and defaults applied, typed as the schema's output type. It throws if the JSON doesn't match, listing each problem with its path. Supported validators:
+
+- [Zod](https://zod.dev) 3.24 or later
+- [Valibot](https://valibot.dev) 1
+- [ArkType](https://arktype.io) 2
+- [Effect Schema](https://effect.website/docs/schema/introduction/) 4, wrapped with `Schema.toStandardSchemaV1()`
+
+`toJson()` validates synchronously, so validators that only validate asynchronously, such as Yup, aren't supported. Neither are schemas with async refinements.
+
+```ts
+import { z } from "zod";
+
+const TravelSuggestion = z.object({ city: z.string(), reason: z.string() });
+
+const { city, reason } = response.toJson(TravelSuggestion);
+```
+
+### Streaming structured output
+
+When you stream a request with a JSON Schema in `text.format`, the `"json"` event receives the output parsed so far each time more text arrives. Unfinished strings, arrays, and objects are closed, so you always get an object you can render. As the model writes a podcast script, the event receives values like these:
+
+```js
+{ title: "Why the" }
+{ title: "Why the sky is blue", lines: [{ speaker: "host", text: "Wel" }] }
+{ title: "Why the sky is blue", lines: [{ speaker: "host", text: "Welcome back! Today a simple question." }, { speaker: "gu" }] }
+{ title: "Why the sky is blue", lines: [{ speaker: "host", text: "Welcome back! Today a simple question." }, { speaker: "guest", text: "Why is the sky blue?" }] }
+```
+
+A string can stop mid-word, even an enum value such as `"gu"` on its way to `"guest"`. A number is left out until it's complete, so you never see `1` for what becomes `12`. In an array, every item before the last one is finished, so you can use each item as soon as the next one starts. This prints each line of the script once it's finished:
+
+```ts
+const stream = await client.responses.create({
+  model: "grok-4.7",
+  input: "Write a short two-person podcast script about why the sky is blue.",
+  reasoning: { effort: "low" },
+  text: {
+    format: {
+      type: "json_schema",
+      name: "podcast_script",
+      schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          lines: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                speaker: { type: "string", enum: ["host", "guest"] },
+                text: { type: "string" },
+              },
+              required: ["speaker", "text"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["title", "lines"],
+        additionalProperties: false,
+      },
+    },
+  },
+  stream: true,
+});
+
+type Line = { speaker: string; text: string };
+const print = (line: Line) => console.log(`${line.speaker}: ${line.text}`);
+let finished = 0;
+
+const response = await stream
+  .on("json", (partial) => {
+    const lines = (partial as { lines?: Array<Line> }).lines ?? [];
+    while (finished < lines.length - 1) print(lines[finished++]!);
+  })
+  .done();
+
+const script = response.toJson() as { title: string; lines: Array<Line> };
+for (const line of script.lines.slice(finished)) print(line);
+```
+
+To speak each line while the model writes the next one, call `client.voice.speak()` in place of `print`. Values from the `"json"` event aren't validated, so read the complete result from the final response with `toJson()`.
+
+The `"json"` event runs `parsePartialJson()` on the text received so far, and you can call it yourself. It works like `JSON.parse` on JSON that's cut off partway: instead of throwing, it returns what's there so far, with open strings, arrays, and objects closed. It returns `undefined` when the text holds no value yet or is broken rather than unfinished:
+
+```ts
+import { parsePartialJson } from "@xai-official/sdk";
+
+parsePartialJson('{"title":"Why the'); // { title: "Why the" }
+parsePartialJson('{"title":"Why the sky is blue","minutes":1'); // { title: "Why the sky is blue" }
+parsePartialJson('{"title":"Why the sky is blue","minutes":12}'); // { title: "Why the sky is blue", minutes: 12 }
+parsePartialJson('{"title" "oops"}'); // undefined
+```
+
+Call it when you read the events in a loop instead of with `on()`, or on text you forward elsewhere, such as to a browser:
+
+```ts
+let text = "";
+for await (const event of stream) {
+  if (event.type === "response.output_text.delta") {
+    text += event.delta;
+    console.log(parsePartialJson(text));
+  }
+}
+```
 
 ## Tools
 
@@ -501,6 +608,8 @@ const response = await client.responses.create({
 ```
 
 `allowed_x_handles` and `excluded_x_handles` each take up to 20 handles and can't be used together. Set `enable_image_understanding` or `enable_video_understanding` to let the model look at media in posts.
+
+`to_date` is exclusive, so a single day runs from that date to the next: `xSearch({ from_date: "2026-10-01", to_date: "2026-10-02" })`. Without dates, the model chooses which dates to search.
 
 When you stream, each finished search reaches the `server_tool_call` listener as a `custom_tool_call`. Its `name` is the search that ran, such as `x_keyword_search`, and `input` holds the search arguments as a JSON string:
 
@@ -730,7 +839,7 @@ if (result.status === "done") {
 
 `wait()` resolves once the status is no longer `pending`: `done`, `failed`, or `expired`. A failed result includes an `error` with a `code` and `message`. If `video.respect_moderation` is `false`, the video did not pass moderation and has no URL. Video URLs are temporary, so download the file promptly.
 
-`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError` but does not cancel the job, so you can call `wait()` again. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
+`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the job: the video keeps generating and is billed when it finishes. The API has no way to cancel a video yet. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
 
 To animate a still image, pass it as `image`. `image`, `reference_images`, and keyframe images accept a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
 
@@ -893,6 +1002,24 @@ await client.voice.speak({
   text: "Hello [new-tag] there." as UnsafeSpeechText,
   language: "en",
 });
+```
+
+The type check only covers string literals, so text typed as `string` is sent unchecked. That matters for text you don't write yourself, such as a script the model wrote or text your users submit: the model can make up a tag such as `[laff]`, and the API reads it aloud. Put the real tags in the prompt with `INLINE_SPEECH_TAGS` and `WRAPPING_SPEECH_TAGS`, then call `stripInvalidSpeechTags()` before speaking, which removes any tag the API wouldn't recognize and keeps the words it wraps. `checkSpeechText()` returns the same problems the type check reports, for logging, for showing to a user, or for asking the model to fix its text:
+
+```ts
+import { INLINE_SPEECH_TAGS, checkSpeechText, stripInvalidSpeechTags } from "@xai-official/sdk";
+
+const tags = INLINE_SPEECH_TAGS.map((tag) => `[${tag}]`).join(", ");
+const response = await client.responses.create({
+  model: "grok-4.7",
+  input: `Write the opening line of a podcast about volcanoes. You can use these speech tags: ${tags}.`,
+});
+const line = response.toText();
+
+const problems = checkSpeechText(line); // For example: ["Unknown speech tag [laff], did you mean [laugh]?"]
+if (problems.length > 0) console.warn(problems);
+
+await client.voice.speak({ text: stripInvalidSpeechTags(line), language: "en" });
 ```
 
 `voice_id` autocompletes the built-in voices and accepts any other string, such as a custom voice ID or a voice added after this SDK version. List the built-in voices with `client.voice.list()`. To start playback before synthesis finishes, read `speech.body` as a stream. Set `with_timestamps: true` to receive JSON with base64 `audio` and per-character `audio_timestamps` instead of audio bytes.
@@ -1087,7 +1214,9 @@ controller.abort();
 await pending;
 ```
 
-Requests that generate content, such as `responses.create`, `images.generate`, and `images.edit`, retry only explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and use jittered exponential backoff.
+Requests that generate content, such as `responses.create`, `images.generate`, and `images.edit`, retry only explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and otherwise use jittered exponential backoff, which starts at 1 second for a `429`.
+
+Set `retryBeforeOutput: true`, on the client or on one request, to also retry streamed `responses.create()` calls, including ones without `stream`, when they fail before the model produces any output: a `5xx` status, a dropped connection, or a stream error such as a `503` right after `response.created`. All retries of a call share `maxRetries`, so a call makes at most `maxRetries + 1` requests. Events from the failed attempt don't reach your listeners or loop, and every attempt sends the same `x-client-request-id`. Each retry starts a new response, and the API may still bill the failed attempt's input tokens, so this is off by default. Errors after output has started are never retried, and neither are `5xx` responses to `stream: false` requests, which can arrive after the model has finished.
 
 When you leave out `stream`, `responses.create()` streams the response under the hood and resolves to the final response. Streamed responses send headers right away, so long reasoning requests aren't cut off by limits on waiting for headers, such as the 5 minutes that Node's built-in `fetch` allows whatever `timeout` is set to. Reasoning can also go quiet for minutes, so these requests only apply `idleTimeout` when you pass it on the request. Set `stream: false` to send a plain JSON request instead.
 

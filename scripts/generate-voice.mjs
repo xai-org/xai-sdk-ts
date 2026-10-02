@@ -73,9 +73,13 @@ function render({ tags, voiceIds, transcriptionModels, realtimeModels }) {
  * Sources:
 ${Object.values(SOURCES).map((url) => ` * - ${url}`).join("\n")}
  */
-export type InlineSpeechTags = ${tuple(tags.inline)};
+export const INLINE_SPEECH_TAGS = ${tuple(tags.inline)} as const;
 
-export type WrappingSpeechTags = ${tuple(tags.wrapping)};
+export const WRAPPING_SPEECH_TAGS = ${tuple(tags.wrapping)} as const;
+
+export type InlineSpeechTags = [...typeof INLINE_SPEECH_TAGS];
+
+export type WrappingSpeechTags = [...typeof WRAPPING_SPEECH_TAGS];
 
 export type KnownVoiceId =
 ${union(voiceIds)};

@@ -1,4 +1,9 @@
-import type { InlineSpeechTags, WrappingSpeechTags } from "./generated/voice.js";
+import {
+  INLINE_SPEECH_TAGS,
+  WRAPPING_SPEECH_TAGS,
+  type InlineSpeechTags,
+  type WrappingSpeechTags,
+} from "./generated/voice.js";
 
 type InlineTag = InlineSpeechTags[number];
 type WrappingTag = WrappingSpeechTags[number];
@@ -190,3 +195,149 @@ export type SpeechText<T extends string> = string extends T
       ? T
       : Message<Problems>
     : never;
+
+const INLINE = new Set<string>(INLINE_SPEECH_TAGS);
+const WRAPPING = new Set<string>(WRAPPING_SPEECH_TAGS);
+const TAG_NAME = /^[a-z]+(?:-[a-z]+)*$/;
+
+type Tag = { kind: "inline" | "open" | "close"; name: string; start: number; end: number };
+
+/** Inline and wrapping tags are scanned separately, like the `SpeechText` check, so neither hides the other. */
+function inlineTags(text: string): Array<Tag> {
+  const tags: Array<Tag> = [];
+  for (const match of text.matchAll(/\[([^[\]]*)\]/g)) {
+    const name = match[1] ?? "";
+    if (TAG_NAME.test(name)) {
+      tags.push({ kind: "inline", name, start: match.index, end: match.index + match[0].length });
+    }
+  }
+  return tags;
+}
+
+function wrappingTags(text: string): Array<Tag> {
+  const tags: Array<Tag> = [];
+  for (const match of text.matchAll(/<(\/?)([^<>]*)>/g)) {
+    const name = match[2] ?? "";
+    if (TAG_NAME.test(name)) {
+      const kind = match[1] ? "close" : "open";
+      tags.push({ kind, name, start: match.index, end: match.index + match[0].length });
+    }
+  }
+  return tags;
+}
+
+function closest(name: string, tags: ReadonlyArray<string>): string | undefined {
+  let best: string | undefined;
+  let bestScore = 0;
+  for (const tag of tags) {
+    let prefix = 0;
+    while (prefix < name.length && name[prefix] === tag[prefix]) prefix += 1;
+    const distance = Math.abs(name.length - tag.length);
+    if (prefix < 2 && !(prefix === 1 && distance <= 2)) continue;
+    const score = 2 * prefix - distance;
+    if (best === undefined || score > bestScore) {
+      best = tag;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function suggest(tag: string, suggestion: string | undefined): string {
+  return suggestion === undefined
+    ? `Unknown speech tag ${tag}.`
+    : `Unknown speech tag ${tag}, did you mean ${suggestion}?`;
+}
+
+function unknownInline(name: string): string {
+  if (WRAPPING.has(name)) return `[${name}] is a wrapping tag, use <${name}>…</${name}>.`;
+  const match = closest(name, INLINE_SPEECH_TAGS);
+  return suggest(`[${name}]`, match && `[${match}]`);
+}
+
+function unknownWrapping(tag: string, name: string, opener: "<" | "</"): string {
+  if (INLINE.has(name)) return `${tag} is an inline tag, use [${name}].`;
+  const match = closest(name, WRAPPING_SPEECH_TAGS);
+  return suggest(tag, match && `${opener}${match}>`);
+}
+
+/**
+ * Lists the problems the `SpeechText` type reports for a string literal: unknown tags, and wrapping tags
+ * that aren't closed in order. Use it for text you don't write yourself, such as model output. An empty
+ * array means the API will read every tag as a tag.
+ */
+export function checkSpeechText(text: string): Array<string> {
+  const problems: Array<string> = [];
+  for (const tag of inlineTags(text)) {
+    if (!INLINE.has(tag.name)) problems.push(unknownInline(tag.name));
+  }
+  const open: Array<string> = [];
+  for (const { kind, name } of wrappingTags(text)) {
+    if (kind === "open") {
+      open.push(name);
+      if (!WRAPPING.has(name)) problems.push(unknownWrapping(`<${name}>`, name, "<"));
+      continue;
+    }
+    const index = open.lastIndexOf(name);
+    if (index === -1) {
+      problems.push(WRAPPING.has(name) ? `</${name}> has no opening tag.` : unknownWrapping(`</${name}>`, name, "</"));
+    } else if (index !== open.length - 1) {
+      problems.push(`Close <${open.at(-1)}> before </${name}>.`);
+      open.splice(index, 1);
+    } else {
+      open.pop();
+    }
+  }
+  for (const name of open) {
+    if (WRAPPING.has(name)) problems.push(`<${name}> is never closed.`);
+  }
+  return problems;
+}
+
+function stripOnce(text: string): string {
+  const tags = [...inlineTags(text), ...wrappingTags(text)].sort((a, b) => a.start - b.start);
+  const drop = new Set<Tag>();
+  const open: Array<Tag> = [];
+  for (const tag of tags) {
+    if (tag.kind === "inline") {
+      if (!INLINE.has(tag.name)) drop.add(tag);
+    } else if (tag.kind === "open") {
+      open.push(tag);
+    } else {
+      const index = open.findLastIndex((opener) => opener.name === tag.name);
+      if (index === -1) {
+        drop.add(tag);
+        continue;
+      }
+      const [opener] = open.splice(index, 1);
+      const closesInnermost = index === open.length;
+      if (opener && (!closesInnermost || !WRAPPING.has(tag.name))) {
+        drop.add(opener);
+        drop.add(tag);
+      }
+    }
+  }
+  for (const opener of open) drop.add(opener);
+  let out = "";
+  let last = 0;
+  for (const tag of tags) {
+    if (!drop.has(tag)) continue;
+    out += text.slice(last, tag.start);
+    last = tag.end;
+  }
+  return out + text.slice(last);
+}
+
+/**
+ * Removes the tags `checkSpeechText` reports, keeping the words they wrap, so the API doesn't read them
+ * aloud. A misnested pair is removed whole; well-formed known tags are kept.
+ */
+export function stripInvalidSpeechTags(text: string): string {
+  let current = text;
+  while (true) {
+    // Removing a tag can join the text around it into a new tag, so repeat until nothing changes.
+    const next = stripOnce(current);
+    if (next === current) return next;
+    current = next;
+  }
+}

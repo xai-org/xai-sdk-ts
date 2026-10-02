@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isFunctionCall, isMessage, isReasoning, SpaceXAI } from "../src/index.js";
+import { z } from "zod";
+import {
+  type StandardSchema,
+  type StandardSchemaIssue,
+  isFunctionCall,
+  isMessage,
+  isReasoning,
+  SpaceXAI,
+} from "../src/index.js";
 import { inlineImageInput } from "../src/porcelain.js";
 import {
   completedResponse,
@@ -77,6 +85,52 @@ describe("porcelain", () => {
     const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toEqual({ ok: true });
     expect(res.toJson()).toEqual({ ok: true });
+  });
+
+  it("toJson validates with a Zod schema and returns Zod's output", async () => {
+    const script = { title: "Ep. 1", minutes: "12", lines: [{ speaker: "host", text: "Hi" }] };
+    const { fetch } = mockFetch(() =>
+      jsonResponse({
+        ...completedResponse,
+        output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: JSON.stringify(script) }] }],
+      }),
+    );
+    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const Line = z.object({ speaker: z.enum(["host", "guest"]), text: z.string() });
+    const Script = z.object({
+      title: z.string(),
+      minutes: z.coerce.number(),
+      lines: z.array(Line),
+      mood: z.string().default("upbeat"),
+    });
+
+    expect(res.toJson(Script)).toEqual({
+      title: "Ep. 1",
+      minutes: 12,
+      lines: [{ speaker: "host", text: "Hi" }],
+      mood: "upbeat",
+    });
+
+    const Strict = z.object({ title: z.number(), lines: z.array(Line.extend({ speaker: z.literal("guest") })) });
+    expect(() => res.toJson(Strict)).toThrow(
+      /^Structured output doesn't match the schema: title: .+; lines\.0\.speaker: .+$/,
+    );
+
+    expect(() => res.toJson(Script.refine(async () => true))).toThrow(TypeError);
+  });
+
+  it("toJson accepts any Standard Schema validator", async () => {
+    const { fetch } = mockFetch(() => jsonResponse(jsonSchemaResponse));
+    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const schema = <Output>(
+      validate: (value: unknown) => { value: Output } | { issues: Array<StandardSchemaIssue> },
+    ): StandardSchema<Output> => ({ "~standard": { version: 1, vendor: "test", validate } });
+
+    const flag = schema((value) => ({ value: { flag: (value as { ok: boolean }).ok } }));
+    expect(res.toJson(flag)).toEqual({ flag: true });
+
+    const strict = schema(() => ({ issues: [{ message: "Expected false", path: [{ key: "ok" }] }, { message: "Too short" }] }));
+    expect(() => res.toJson(strict)).toThrow("Structured output doesn't match the schema: ok: Expected false; Too short");
   });
 
   it("truncated stream: parsed is null, toJson throws, toText returns the fragment", async () => {

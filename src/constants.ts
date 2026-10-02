@@ -74,3 +74,10 @@ export const RETRYABLE_STATUS = new Set([429]);
 
 /** Extra statuses retried only for read-only methods. */
 export const IDEMPOTENT_RETRY_STATUS = new Set([408, 409, 500, 502, 503, 504, 529]);
+
+/** Server errors that `retryBeforeOutput` also retries for creates, as an HTTP status or a stream error before output. */
+export const SERVER_ERROR_RETRY_STATUS = new Set([500, 502, 503, 504, 529]);
+
+export const BACKOFF_MS = { initial: 250, max: 8_000 };
+/** Rate limits reset over seconds, so a 429 without `Retry-After` starts with a longer wait. */
+export const RATE_LIMIT_BACKOFF_MS = { initial: 1_000, max: 30_000 };

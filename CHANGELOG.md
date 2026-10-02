@@ -2,6 +2,19 @@
 
 All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
+## [0.2.1] - 2026-10-02
+
+### Added
+
+- `toJson(schema)` validates structured output with a Standard Schema validator, such as a Zod, Valibot, or ArkType schema, and returns the schema's typed output.
+- A `"json"` stream event and `parsePartialJson()` for reading structured output while it streams.
+- `checkSpeechText()` and `stripInvalidSpeechTags()` check speech tags at runtime, for text such as model output. `INLINE_SPEECH_TAGS` and `WRAPPING_SPEECH_TAGS` list the known tags.
+- `retryBeforeOutput` retries a streamed `responses.create()` that fails before the model produces any output, within `maxRetries`.
+
+### Changed
+
+- A `429` without `Retry-After` now backs off from 1 second, up to 30 seconds, instead of from 250 milliseconds.
+
 ## [0.2.0] - 2026-10-02
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "@xai-official/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The official TypeScript SDK for the SpaceXAI API",
   "keywords": [
     "xai",
@@ -79,6 +79,7 @@
     "oxlint": "1.80.0",
     "publint": "0.3.24",
     "typescript": "5.8.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "zod": "4.6.5"
   }
 }

@@ -12,7 +12,10 @@ export function webSearch(options: OptionsOf<"web_search"> = {}): ToolOf<"web_se
   return { ...options, type: "web_search" };
 }
 
-/** Searches posts on X. `allowed_x_handles` and `excluded_x_handles` can't be used together. */
+/**
+ * Searches posts on X. `allowed_x_handles` and `excluded_x_handles` can't be used together. `to_date` is
+ * exclusive, so one day is `{ from_date: "2026-10-01", to_date: "2026-10-02" }`.
+ */
 export function xSearch(options: OptionsOf<"x_search"> = {}): ToolOf<"x_search"> {
   return { ...options, type: "x_search" };
 }

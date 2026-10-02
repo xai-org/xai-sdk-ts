@@ -24,6 +24,7 @@ jobs:
       package_name: ${{ steps.metadata.outputs.package_name }}
       version: ${{ steps.metadata.outputs.version }}
       access: ${{ steps.metadata.outputs.access }}
+      dist_tag: ${{ steps.metadata.outputs.dist_tag }}
     steps:
       - name: Checkout selected tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,6 +95,11 @@ jobs:
           if (process.env.TAG_NAME !== `v${version}`) {
             throw new Error(`Tag ${process.env.TAG_NAME} does not match package version ${version}.`);
           }
+          const prerelease = version.match(/-(alpha|beta|rc|internal)\./)?.[1];
+          const distTag = prerelease === undefined ? "latest" : prerelease === "internal" ? "internal" : "next";
+          if (pkg.publishConfig?.tag !== undefined) {
+            throw new Error(`Remove publishConfig.tag. This workflow publishes ${version} under "${distTag}".`);
+          }
           const isPrerelease = version.includes("-");
           const hasSection = changelog.includes(`## [${version}]`) || changelog.includes(`## [v${version}]`);
           if (!hasSection && !(isPrerelease && changelog.includes("## [Unreleased]"))) {
@@ -102,7 +108,7 @@ jobs:
 
           appendFileSync(
             process.env.GITHUB_OUTPUT,
-            `package_name=${pkg.name}\nversion=${version}\naccess=${access}\n`,
+            `package_name=${pkg.name}\nversion=${version}\naccess=${access}\ndist_tag=${distTag}\n`,
           );
           NODE
 
@@ -154,6 +160,7 @@ jobs:
           PACKAGE_NAME: ${{ needs.validate.outputs.package_name }}
           VERSION: ${{ needs.validate.outputs.version }}
           ACCESS: ${{ needs.validate.outputs.access }}
+          DIST_TAG: ${{ needs.validate.outputs.dist_tag }}
         run: |
           set -- ./artifacts/*.tgz
           if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
@@ -162,8 +169,8 @@ jobs:
           fi
           # Releases are immutable: the registry rejects an existing version,
           # which fails this job and stops the GitHub release from being created.
-          echo "Publishing $PACKAGE_NAME@$VERSION with $ACCESS access."
-          npm publish "$1" --access "$ACCESS"
+          echo "Publishing $PACKAGE_NAME@$VERSION with $ACCESS access under the $DIST_TAG dist-tag."
+          npm publish "$1" --access "$ACCESS" --tag "$DIST_TAG"
 
   github-release:
     name: create GitHub release

@@ -1,4 +1,5 @@
 import {
+  BACKOFF_MS,
   CLIENT_REQUEST_ID_HEADER,
   DEFAULT_IDLE_TIMEOUT_MS,
   DEFAULT_MAX_ERROR_BODY_BYTES,
@@ -6,8 +7,10 @@ import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_TIMEOUT_MS,
   IDEMPOTENT_RETRY_STATUS,
+  RATE_LIMIT_BACKOFF_MS,
   RETRYABLE_STATUS,
   SDK_USER_AGENT,
+  SERVER_ERROR_RETRY_STATUS,
 } from "./constants.js";
 import { apiKeyFor } from "./credentials.js";
 import { debugEnabled, isNode, sdkLanguage } from "./env.js";
@@ -110,16 +113,32 @@ function mergeSignals(signals: Array<AbortSignal | undefined>): { signal?: Abort
   };
 }
 
-export function retryDelayMs(attempt: number, retryAfter: string | null): number {
+export function retryDelayMs(attempt: number, retryAfter: string | null, status?: number): number {
   if (retryAfter) {
     const seconds = Number.parseFloat(retryAfter);
     if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 60_000);
     const date = Date.parse(retryAfter);
     if (!Number.isNaN(date)) return Math.min(Math.max(date - Date.now(), 0), 60_000);
   }
-  const base = 250 * 2 ** attempt;
-  const capped = Math.min(base, 8_000);
+  const { initial, max } = status === 429 ? RATE_LIMIT_BACKOFF_MS : BACKOFF_MS;
+  const capped = Math.min(initial * 2 ** attempt, max);
   return capped * (0.5 + Math.random() * 0.5);
+}
+
+/** The retries left for one call. Requests that share it make at most `max + 1` attempts in total. */
+export class RetryBudget {
+  #spent = 0;
+
+  constructor(readonly max: number) {}
+
+  get canRetry(): boolean {
+    return this.#spent < this.max;
+  }
+
+  /** Spends one retry and returns how many were spent before it, which sets the backoff. */
+  spend(): number {
+    return this.#spent++;
+  }
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -180,6 +199,10 @@ export type InternalRequest = {
   /** Accept a JSON response in place of the requested event stream. */
   acceptJson?: boolean;
   binary?: boolean;
+  /** Also retry 5xx statuses and connection failures for this create, for `retryBeforeOutput`. */
+  retryServerErrors?: boolean;
+  /** Shared with the other requests of the same call. Defaults to a new budget of `maxRetries`. */
+  retryBudget?: RetryBudget;
   opts?: RequestOpts;
 };
 
@@ -204,8 +227,9 @@ function isReadOnlyMethod(method: string): boolean {
   return method === "GET" || method === "HEAD";
 }
 
-export function shouldRetryStatus(method: string, status: number): boolean {
+export function shouldRetryStatus(method: string, status: number, retryServerErrors = false): boolean {
   if (RETRYABLE_STATUS.has(status)) return true;
+  if (retryServerErrors && SERVER_ERROR_RETRY_STATUS.has(status)) return true;
   return isReadOnlyMethod(method) && IDEMPOTENT_RETRY_STATUS.has(status);
 }
 
@@ -298,7 +322,7 @@ async function sendWithRetries(
   clientRequestId: string,
 ): Promise<SendResult> {
   const timeout = req.opts?.timeout ?? client.timeout;
-  const maxRetries = req.opts?.maxRetries ?? client.maxRetries;
+  const budget = req.retryBudget ?? new RetryBudget(req.opts?.maxRetries ?? client.maxRetries);
   const idleTimeout = req.opts?.idleTimeout ?? client.idleTimeout;
   const maxResponseBodyBytes =
     req.opts?.maxResponseBodyBytes ?? client.maxResponseBodyBytes;
@@ -309,7 +333,6 @@ async function sendWithRetries(
   const binary = Boolean(req.binary);
   const accept = stream ? "text/event-stream" : binary ? "*/*" : "application/json";
 
-  let attempt = 0;
   let lastRequestId: string | null = null;
 
   while (true) {
@@ -365,9 +388,11 @@ async function sendWithRetries(
         }
         cleanupAttempt();
         if (signal?.aborted) throw err;
-        if (shouldRetryStatus(req.method, response.status) && attempt < maxRetries) {
-          attempt += 1;
-          await sleep(retryDelayMs(attempt - 1, response.headers.get("retry-after")), req.opts?.signal);
+        if (shouldRetryStatus(req.method, response.status, req.retryServerErrors) && budget.canRetry) {
+          await sleep(
+            retryDelayMs(budget.spend(), response.headers.get("retry-after"), response.status),
+            req.opts?.signal,
+          );
           continue;
         }
         throw err;
@@ -431,9 +456,8 @@ async function sendWithRetries(
         throw errorFromUnknown(err, lastRequestId);
       }
       if (APIError.is(err) && err.name !== "APIConnectionError") throw err;
-      if (isReadOnlyMethod(req.method) && attempt < maxRetries) {
-        attempt += 1;
-        await sleep(retryDelayMs(attempt - 1, null), req.opts?.signal);
+      if ((isReadOnlyMethod(req.method) || req.retryServerErrors) && budget.canRetry) {
+        await sleep(retryDelayMs(budget.spend(), null), req.opts?.signal);
         continue;
       }
       throw errorFromUnknown(err, lastRequestId);
