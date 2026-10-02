@@ -2,7 +2,7 @@
 
 All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
-## [Unreleased]
+## [0.2.1] - 2026-10-02
 
 ### Added
 
