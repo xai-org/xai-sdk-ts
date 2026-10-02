@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with the xAI TypeScript SDK
+description: Report a problem with the SpaceXAI TypeScript SDK
 title: "[BUG] "
 labels:
   - bug
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this form for SDK client behavior. Contact xAI support for account, quota, billing, model output, or server-side API issues.
+        Use this form for SDK client behavior. Contact SpaceXAI support for account, quota, billing, model output, or server-side API issues.
         Remove API keys, prompts, customer data, and other sensitive information before submitting.
 
   - type: checkboxes
