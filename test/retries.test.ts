@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SpaceXAI } from "../src/index.js";
+import { ModelResponse, SpaceXAI } from "../src/index.js";
 import { completedResponse, createBody, erroringSse, jsonResponse, mockFetch, sseResponse } from "./helpers.js";
 
 describe("retries", () => {
@@ -146,5 +146,34 @@ describe("retryBeforeOutput", () => {
     const response = await client.responses.create(createBody, { retryBeforeOutput: true });
     expect(response.toText()).toBe("Hello world");
     expect(captured.requests).toHaveLength(4);
+  });
+
+  it("accepts a JSON response when it retries create() without stream", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { fetch, captured } = mockFetch((_req, n) =>
+      n === 1
+        ? sseResponse([created], { headers: { "x-request-id": "req_1" } })
+        : jsonResponse(completedResponse, { headers: { "x-request-id": "req_2" } }),
+    );
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const response = await client.responses.create(createBody);
+    expect(response).toBeInstanceOf(ModelResponse);
+    expect(response.toText()).toBe("Hello world");
+    expect(response.http.requestId).toBe("req_2");
+    expect(captured.requests).toHaveLength(2);
+  });
+
+  it("still requires an event stream when it retries a stream: true request", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { fetch, captured } = mockFetch((_req, n) =>
+      n === 1 ? sseResponse([created]) : jsonResponse(completedResponse),
+    );
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const stream = await client.responses.create({ ...createBody, stream: true });
+    await expect(stream.done()).rejects.toMatchObject({
+      name: "APIProtocolError",
+      message: "Streaming response must use text/event-stream",
+    });
+    expect(captured.requests).toHaveLength(2);
   });
 });

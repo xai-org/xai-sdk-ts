@@ -85,7 +85,7 @@ export class Responses {
       body: result.body,
       http: result.http,
       signal: opts?.signal,
-      retry: budget && this.#streamRetry(payload, streamOpts, result.http, budget),
+      retry: budget && this.#streamRetry(payload, streamOpts, result.http, budget, true),
     }).done();
     if (opts?.http?.body) response.http.body = response.raw;
     return response;
@@ -103,6 +103,7 @@ export class Responses {
     opts: RequestOpts | undefined,
     http: HttpMeta,
     budget: RetryBudget,
+    acceptJson = false,
   ): StreamRetry {
     const headers = new Headers(opts?.headers);
     headers.set(CLIENT_REQUEST_ID_HEADER, http.clientRequestId);
@@ -114,11 +115,12 @@ export class Responses {
           path: "/responses",
           body: { ...payload, stream: true },
           stream: true,
+          acceptJson,
           retryServerErrors: true,
           retryBudget: budget,
           opts: { ...opts, headers },
         });
-        return { body: result.body, http: result.http };
+        return { body: result.body, http: result.http, payload: result.payload };
       },
     };
   }

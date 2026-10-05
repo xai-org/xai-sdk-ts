@@ -2,6 +2,12 @@
 
 All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- A `responses.create()` without `stream` now resolves when a `retryBeforeOutput` retry returns JSON, as it does when the first attempt returns JSON, instead of throwing `Streaming response must use text/event-stream`.
+
 ## [0.2.1] - 2026-10-02
 
 ### Added
