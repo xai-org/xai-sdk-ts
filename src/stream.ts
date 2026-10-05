@@ -84,7 +84,8 @@ const HELPER_EVENTS: Record<keyof HelperListeners, true> = {
 
 /** Sends the request again when a stream fails before any output, for `retryBeforeOutput`. */
 export type StreamRetry = {
-  resend: () => Promise<{ body: ReadableStream<Uint8Array> | null; http: HttpMeta }>;
+  /** `body` is null when a request that accepts JSON gets the final response as JSON, in `payload`. */
+  resend: () => Promise<{ body: ReadableStream<Uint8Array> | null; http: HttpMeta; payload: unknown }>;
   /** Shared with the HTTP retries of every request in the call. */
   budget: RetryBudget;
 };
@@ -274,6 +275,7 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
         this.#body = next.body;
         this.#http = next.http;
         this.#requestId = next.http.requestId;
+        if (!next.body) this.#final = this.#terminalResponse(next.payload);
       }
       if (!this.#closed && !this.#final && !this.#error) {
         throw new APIProtocolError("Stream ended without a terminal response event", {
