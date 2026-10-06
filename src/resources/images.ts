@@ -54,6 +54,12 @@ function toResult(result: SendResult, deferred: boolean | null | undefined): Ima
   return deferred === true ? toStartResponse(result) : toImageResponse(result);
 }
 
+/** A 202 means pending whatever its body says, so a body without `status` still counts. */
+function pendingBody(payload: unknown): Record<string, unknown> {
+  const body = typeof payload === "object" && payload !== null && !Array.isArray(payload) ? payload : {};
+  return { status: "pending", ...body };
+}
+
 export class Images {
   constructor(private readonly client: SpaceXAI) {}
 
@@ -96,10 +102,9 @@ export class Images {
       path: `/images/${encodeURIComponent(requestId)}`,
       opts,
     });
-    // Pending requests answer 202, with or without a JSON body.
-    const body: Record<string, unknown> =
-      result.http.status === 202 && result.payload === null
-        ? { status: "pending" }
+    const body =
+      result.http.status === 202
+        ? pendingBody(result.payload)
         : requireRecord(result.payload, result.http, "Deferred image response");
     if (typeof body.status !== "string") {
       throw new APIProtocolError("Deferred image response is missing status", {

@@ -404,6 +404,19 @@ describe("images.get", () => {
     expect(withBody.http.status).toBe(202);
   });
 
+  it("treats any 202 as pending, even when its body has no status", async () => {
+    const { fetch } = mockFetch((_req, n) =>
+      n === 1
+        ? jsonResponse({ request_id: requestId }, { status: 202 })
+        : new Response("queued", { status: 202, headers: { "content-type": "text/plain" } }),
+    );
+    const c = client(fetch);
+    const pending = { request_id: requestId, status: "pending", usage: null };
+
+    expect(await c.images.get(requestId)).toMatchObject(pending);
+    expect(await c.images.get(requestId)).toMatchObject(pending);
+  });
+
   it("fills in request_id when the body leaves it out", async () => {
     const { fetch } = mockFetch(() => jsonResponse({ status: "done", data: imageResponse.data }));
     expect((await client(fetch).images.get(requestId)).request_id).toBe(requestId);
