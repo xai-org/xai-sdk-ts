@@ -10,8 +10,11 @@ import type {
   OutputItem,
   OutputMessage,
   ReasoningItem,
+  TranscriptionParams,
   VideoInput,
 } from "./types.js";
+
+type AudioFormat = NonNullable<TranscriptionParams["audio_format"]>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -111,6 +114,10 @@ function hasBytes(bytes: Uint8Array, offset: number, expected: ReadonlyArray<num
   return expected.every((byte, index) => bytes[offset + index] === byte);
 }
 
+function ascii(text: string): Array<number> {
+  return Array.from(text, (char) => char.charCodeAt(0));
+}
+
 /** The API rejects image data URLs that are not typed as JPEG, PNG, or WebP. */
 function sniffImageType(bytes: Uint8Array): string {
   if (hasBytes(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
@@ -121,16 +128,41 @@ function sniffImageType(bytes: Uint8Array): string {
   return "application/octet-stream";
 }
 
+/** The audio containers the API detects, named as `audio_format` names them. Raw PCM has no header. */
+function sniffAudioFormat(bytes: Uint8Array): AudioFormat | undefined {
+  if (hasBytes(bytes, 0, ascii("ID3"))) return "mp3";
+  // After the sync bits, MPEG Layer III frames have layer bits 01, and AAC's ADTS headers have 00.
+  if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe6) === 0xe2) return "mp3";
+  if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xf6) === 0xf0) return "aac";
+  if (hasBytes(bytes, 0, ascii("RIFF")) && hasBytes(bytes, 8, ascii("WAVE"))) return "wav";
+  if (hasBytes(bytes, 0, ascii("fLaC"))) return "flac";
+  if (hasBytes(bytes, 0, ascii("OggS"))) {
+    // The first packet, which names the codec, follows the page's 27-byte header and segment table.
+    return hasBytes(bytes, 27 + (bytes[26] ?? 0), ascii("OpusHead")) ? "opus" : "ogg";
+  }
+  if (hasBytes(bytes, 4, ascii("ftyp"))) {
+    return hasBytes(bytes, 8, ascii("M4A ")) || hasBytes(bytes, 8, ascii("M4B ")) ? "m4a" : "mp4";
+  }
+  if (hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3])) {
+    // WebM is Matroska with Opus or Vorbis audio, which the API doesn't take as `mkv`.
+    const docType = ascii("matroska");
+    return bytes.some((_, offset) => hasBytes(bytes, offset, docType)) ? "mkv" : undefined;
+  }
+  return undefined;
+}
+
+/** Reads only the first bytes, since the Blob can be a long recording. */
+export async function readAudioFormat(blob: Blob, signal?: AbortSignal): Promise<AudioFormat | undefined> {
+  return sniffAudioFormat(new Uint8Array(await abortable(blob.slice(0, 64).arrayBuffer(), signal)));
+}
+
 /** Video generation takes images and reference audio, which is usually WAV or MP3. */
 function sniffMediaType(bytes: Uint8Array): string {
   const image = sniffImageType(bytes);
   if (image !== "application/octet-stream") return image;
-  if (hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && hasBytes(bytes, 8, [0x57, 0x41, 0x56, 0x45])) {
-    return "audio/wav";
-  }
-  if (hasBytes(bytes, 0, [0x49, 0x44, 0x33]) || (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0)) {
-    return "audio/mpeg";
-  }
+  const audio = sniffAudioFormat(bytes);
+  if (audio === "wav") return "audio/wav";
+  if (audio === "mp3") return "audio/mpeg";
   return "application/octet-stream";
 }
 

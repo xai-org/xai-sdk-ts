@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AbortError,
   APIProtocolError,
   type ClientSecretCreateParams,
   type CustomVoiceUpdateParams,
@@ -44,6 +45,13 @@ function audioResponse(bytes: Uint8Array, contentType: string): Response {
 
 async function formEntries(request: Request | undefined): Promise<Array<[string, FormDataEntryValue]>> {
   return [...(await request!.formData()).entries()];
+}
+
+/** Builds a file's leading bytes from ASCII signatures and byte values. */
+function bytesOf(...parts: Array<string | Array<number>>): Uint8Array {
+  return new Uint8Array(
+    parts.flatMap((part) => (typeof part === "string" ? Array.from(part, (char) => char.charCodeAt(0)) : part)),
+  );
 }
 
 describe("voice.speak", () => {
@@ -171,7 +179,6 @@ describe("voice.transcribe", () => {
       new Blob([bytes], { type: "video/x-matroska" }),
       new File([bytes], "", { type: "audio/flac" }),
       new File([bytes], "call.mp3", { type: "audio/wav" }),
-      new Blob([bytes]),
       new Blob([bytes], { type: "audio/webm" }),
     ];
     for (const file of files) await c.voice.transcribe({ file, diarize: true });
@@ -190,9 +197,85 @@ describe("voice.transcribe", () => {
       [["diarize", "file"], "audio.flac"],
       [["diarize", "file"], "call.mp3"],
       [["diarize", "file"], "blob"],
-      [["diarize", "file"], "blob"],
       [["audio_format", "file"], "blob"],
     ]);
+  });
+
+  it("names an unnamed Blob without a MIME type after the format its first bytes show", async () => {
+    const wav = bytesOf("RIFF", [0x24, 0, 0, 0], "WAVEfmt ");
+    // An Ogg page header up to its segment count at byte 26, then the segment table and first packet.
+    const oggPage = bytesOf("OggS", [0, 2], Array.from({ length: 20 }, () => 0));
+    const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
+    const c = client(fetch);
+    const files = [
+      new Blob([bytesOf("ID3", [4, 0, 0, 0, 0, 0, 0])]),
+      new Blob([bytesOf([0xff, 0xfb, 0x90, 0x00])]),
+      new Blob([bytesOf([0xff, 0xf1, 0x50, 0x80, 0x02, 0x1f, 0xfc])]),
+      new Blob([wav, new Uint8Array(100)]),
+      new Blob([bytesOf("fLaC", [0, 0, 0, 0x22])]),
+      new Blob([oggPage, bytesOf([1, 30, 1], "vorbis")]),
+      new Blob([oggPage, bytesOf([1, 19], "OpusHead", [1, 2])]),
+      new Blob([bytesOf("OggS")]),
+      new Blob([bytesOf([0, 0, 0, 0x20], "ftypM4A ", [0, 0, 0, 0])]),
+      new Blob([bytesOf([0, 0, 0, 0x20], "ftypM4B ", [0, 0, 0, 0])]),
+      new Blob([bytesOf([0, 0, 0, 0x18], "ftypisom", [0, 0, 2, 0])]),
+      new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0xa3, 0x42, 0x86, 0x81, 1, 0x42, 0x82, 0x88], "matroska")]),
+      new File([wav], "", { type: "application/octet-stream" }),
+      new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 1, 0x42, 0x82, 0x84], "webm")]),
+      new Blob([bytesOf([0xff, 0xfd, 0x90, 0x00])]),
+      new Blob([bytesOf("Hello")]),
+      new Blob([bytesOf([0xff])]),
+      new Blob([]),
+      new File([wav], "call.bin"),
+      new Blob([wav], { type: "audio/webm" }),
+    ];
+    for (const file of files) await c.voice.transcribe({ file, diarize: true });
+    await c.voice.transcribe({ file: new Blob([wav]), audio_format: "wav" });
+
+    const sent: Array<File> = [];
+    for (const request of captured.requests) sent.push((await request.formData()).get("file") as File);
+    expect(sent.map((file) => file.name)).toEqual([
+      "audio.mp3",
+      "audio.mp3",
+      "audio.aac",
+      "audio.wav",
+      "audio.flac",
+      "audio.ogg",
+      "audio.opus",
+      "audio.ogg",
+      "audio.m4a",
+      "audio.m4a",
+      "audio.mp4",
+      "audio.mkv",
+      "audio.wav",
+      "blob",
+      "blob",
+      "blob",
+      "blob",
+      "blob",
+      "call.bin",
+      "blob",
+      "blob",
+    ]);
+    expect(sent[3]?.size).toBe(wav.length + 100);
+  });
+
+  it("aborts while reading the first bytes of a Blob without a MIME type", async () => {
+    const ac = new AbortController();
+    class HangingBlob extends Blob {
+      override slice(): Blob {
+        return this;
+      }
+      override arrayBuffer(): Promise<ArrayBuffer> {
+        queueMicrotask(() => ac.abort());
+        return new Promise(() => {});
+      }
+    }
+    const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
+    await expect(
+      client(fetch).voice.transcribe({ file: new HangingBlob(["audio"]), diarize: true }, { signal: ac.signal }),
+    ).rejects.toBeInstanceOf(AbortError);
+    expect(captured.requests).toHaveLength(0);
   });
 
   it("sends a url instead of a file and skips undefined options", async () => {
@@ -287,6 +370,18 @@ describe("voice.custom", () => {
 
     expect(voice).toMatchObject(customVoice);
     expect(voice.http.status).toBe(201);
+  });
+
+  it("names a clip without a MIME type after the format its first bytes show", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse(customVoice, { status: 201 }));
+    await client(fetch).voice.custom.create({
+      file: new Blob([bytesOf("RIFF", [0x24, 0, 0, 0], "WAVEfmt ")]),
+      name: "Friendly Narrator",
+    });
+
+    const [name, file] = (await formEntries(captured.requests[0])).at(-1)!;
+    expect(name).toBe("file");
+    expect((file as File).name).toBe("audio.wav");
   });
 
   it("lists voices and passes pagination query parameters", async () => {

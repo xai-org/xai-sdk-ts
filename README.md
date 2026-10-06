@@ -1042,7 +1042,7 @@ console.log(transcript.text);
 
 `format: true` writes spoken numbers, currencies, and units in written form, and requires `language`. Word-level timings are in `transcript.words`.
 
-With `diarize: true`, each word also has a `speaker`, and the API takes the audio format from the file name. A `File` sends its own name, and the SDK names a `Blob` with a MIME type after it, such as `audio.mp3` for `openAsBlob("./meeting.mp3", { type: "audio/mpeg" })`.
+With `diarize: true`, each word also has a `speaker`, and the API takes the audio format from the file name. A `File` sends its own name. The SDK names a `Blob` after its MIME type, such as `audio.mp3` for `audio/mpeg`, and a `Blob` without one, such as one from `openAsBlob()`, after the format its first bytes show: MP3, AAC, WAV, FLAC, Ogg, Opus, M4A, MP4, or Matroska. For a file in another format, give the `Blob` a `type` when you create it.
 
 Clone a voice from a reference clip of up to 120 seconds with `client.voice.custom.create()`. Creating custom voices through the API requires an Enterprise plan:
 
