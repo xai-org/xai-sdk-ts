@@ -781,38 +781,13 @@ const result = await client.images.generate(
 
 Each result provides `data`, `usage`, and `http`. `usage.cost_usd` converts the reported `cost_in_usd_ticks` to US dollars, and `usage` is `null` when the API omits it.
 
-### Deferred image requests
-
-Set `deferred: true` to have `generate()` or `edit()` return a `request_id` right away while the images generate in the background. `wait()` polls until they're ready:
+To store images in your own bucket instead of with SpaceXAI, pass `output.upload_urls`: signed URLs that accept an HTTP `PUT`, one per image. Each image is uploaded to its URL, and its `url` in the result is that upload URL. Uploads need the default `response_format: "url"`:
 
 ```ts
-const { request_id } = await client.images.generate({
-  model: "grok-imagine-image-2.0",
-  prompt: "A collage of London landmarks in a stenciled street-art style",
-  deferred: true,
-});
-
-const result = await client.images.wait(request_id);
-if (result.status === "done") {
-  console.log(result.data?.[0]?.url);
-  console.log(result.usage?.cost_usd);
-} else {
-  console.error(result.status, result.error?.code, result.error?.message);
-}
-```
-
-`wait()` resolves once the status is no longer `pending`: `done`, with `data` and `usage`, or `failed`, with an `error` that has a `code` and `message`. It polls every second for up to 5 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the request, and the API has no way to cancel one. To check once without waiting, call `client.images.get(request_id)`, which returns `status: "pending"` until the images are ready. A `request_id` that's unknown or whose result has expired rejects with `NotFoundError`. Deferred requests support only the default `response_format: "url"`.
-
-To build deferred params ahead of time, type them as `DeferredImageGenerateParams` or `DeferredImageEditParams`, so that `generate()` and `edit()` resolve to a `request_id`.
-
-To store images in your own bucket instead of with SpaceXAI, pass `output.upload_urls`: signed URLs that accept an HTTP `PUT`, one per image. Each image is uploaded to its URL, and its `url` in the result is that upload URL. This works with or without `deferred`, but Zero Data Retention teams must set it to use `deferred`:
-
-```ts
-const { request_id } = await client.images.generate({
+const result = await client.images.generate({
   model: "grok-imagine-image-2.0",
   prompt: "A lighthouse at dawn",
   n: 2,
-  deferred: true,
   output: {
     upload_urls: [
       "https://storage.example.com/lighthouse-1.jpg?signature=...",
@@ -820,6 +795,8 @@ const { request_id } = await client.images.generate({
     ],
   },
 });
+
+console.log(result.data.map((image) => image.url));
 ```
 
 Each upload's `Content-Type` is the image's `mime_type`, which is `image/jpeg` unless the requested quality produces PNG, so sign the URLs for that type or without a `Content-Type` constraint.
@@ -858,7 +835,7 @@ const result = await client.images.edit({
 });
 ```
 
-Edits also accept `deferred` and `output`, as described in [Deferred image requests](#deferred-image-requests).
+Edits also accept `output.upload_urls`, as described in [Image generation](#image-generation).
 
 ## Video generation
 
