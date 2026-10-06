@@ -14,7 +14,8 @@ import type {
   VideoInput,
 } from "./types.js";
 
-type AudioFormat = NonNullable<TranscriptionParams["audio_format"]>;
+/** The formats the API reads from an audio file's name. `audio_format` takes all of them but `webm`. */
+export type AudioFileFormat = NonNullable<TranscriptionParams["audio_format"]> | "webm";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -118,6 +119,10 @@ function ascii(text: string): Array<number> {
   return Array.from(text, (char) => char.charCodeAt(0));
 }
 
+function includesBytes(bytes: Uint8Array, expected: ReadonlyArray<number>): boolean {
+  return bytes.some((_, offset) => hasBytes(bytes, offset, expected));
+}
+
 /** The API rejects image data URLs that are not typed as JPEG, PNG, or WebP. */
 function sniffImageType(bytes: Uint8Array): string {
   if (hasBytes(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
@@ -128,8 +133,8 @@ function sniffImageType(bytes: Uint8Array): string {
   return "application/octet-stream";
 }
 
-/** The audio containers the API detects, named as `audio_format` names them. Raw PCM has no header. */
-function sniffAudioFormat(bytes: Uint8Array): AudioFormat | undefined {
+/** The audio containers the API detects, named by the file extensions it reads. Raw PCM has no header. */
+function sniffAudioFormat(bytes: Uint8Array): AudioFileFormat | undefined {
   if (hasBytes(bytes, 0, ascii("ID3"))) return "mp3";
   // After the sync bits, MPEG Layer III frames have layer bits 01, and AAC's ADTS headers have 00.
   if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe6) === 0xe2) return "mp3";
@@ -144,15 +149,15 @@ function sniffAudioFormat(bytes: Uint8Array): AudioFormat | undefined {
     return hasBytes(bytes, 8, ascii("M4A ")) || hasBytes(bytes, 8, ascii("M4B ")) ? "m4a" : "mp4";
   }
   if (hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3])) {
-    // WebM is Matroska with Opus or Vorbis audio, which the API doesn't take as `mkv`.
-    const docType = ascii("matroska");
-    return bytes.some((_, offset) => hasBytes(bytes, offset, docType)) ? "mkv" : undefined;
+    // Matroska and WebM share the EBML header, whose DocType tells them apart.
+    if (includesBytes(bytes, ascii("matroska"))) return "mkv";
+    return includesBytes(bytes, ascii("webm")) ? "webm" : undefined;
   }
   return undefined;
 }
 
 /** Reads only the first bytes, since the Blob can be a long recording. */
-export async function readAudioFormat(blob: Blob, signal?: AbortSignal): Promise<AudioFormat | undefined> {
+export async function readAudioFormat(blob: Blob, signal?: AbortSignal): Promise<AudioFileFormat | undefined> {
   return sniffAudioFormat(new Uint8Array(await abortable(blob.slice(0, 64).arrayBuffer(), signal)));
 }
 

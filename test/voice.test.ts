@@ -180,6 +180,8 @@ describe("voice.transcribe", () => {
       new File([bytes], "", { type: "audio/flac" }),
       new File([bytes], "call.mp3", { type: "audio/wav" }),
       new Blob([bytes], { type: "audio/webm" }),
+      new Blob([bytes], { type: "video/webm" }),
+      new Blob([bytes], { type: "audio/aiff" }),
     ];
     for (const file of files) await c.voice.transcribe({ file, diarize: true });
     await c.voice.transcribe({ file: new Blob([bytes], { type: "audio/mpeg" }), audio_format: "mp3" });
@@ -196,6 +198,8 @@ describe("voice.transcribe", () => {
       [["diarize", "file"], "audio.mkv"],
       [["diarize", "file"], "audio.flac"],
       [["diarize", "file"], "call.mp3"],
+      [["diarize", "file"], "audio.webm"],
+      [["diarize", "file"], "audio.webm"],
       [["diarize", "file"], "blob"],
       [["audio_format", "file"], "blob"],
     ]);
@@ -220,8 +224,9 @@ describe("voice.transcribe", () => {
       new Blob([bytesOf([0, 0, 0, 0x20], "ftypM4B ", [0, 0, 0, 0])]),
       new Blob([bytesOf([0, 0, 0, 0x18], "ftypisom", [0, 0, 2, 0])]),
       new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0xa3, 0x42, 0x86, 0x81, 1, 0x42, 0x82, 0x88], "matroska")]),
-      new File([wav], "", { type: "application/octet-stream" }),
       new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 1, 0x42, 0x82, 0x84], "webm")]),
+      new File([wav], "", { type: "application/octet-stream" }),
+      new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 1])]),
       new Blob([bytesOf([0xff, 0xfd, 0x90, 0x00])]),
       new Blob([bytesOf("Hello")]),
       new Blob([bytesOf([0xff])]),
@@ -247,6 +252,7 @@ describe("voice.transcribe", () => {
       "audio.m4a",
       "audio.mp4",
       "audio.mkv",
+      "audio.webm",
       "audio.wav",
       "blob",
       "blob",
@@ -254,7 +260,7 @@ describe("voice.transcribe", () => {
       "blob",
       "blob",
       "call.bin",
-      "blob",
+      "audio.webm",
       "blob",
     ]);
     expect(sent[3]?.size).toBe(wav.length + 100);

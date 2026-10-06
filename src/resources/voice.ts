@@ -2,7 +2,7 @@ import { send, type SendResult } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { BinaryResponse } from "../binary.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
-import { readAudioFormat } from "../porcelain.js";
+import { readAudioFormat, type AudioFileFormat } from "../porcelain.js";
 import { requireRecord } from "./shared.js";
 import type {
   ClientSecret,
@@ -36,7 +36,8 @@ const AUDIO_FORMATS = new Set<string>([
   "mp4",
   "m4a",
   "mkv",
-] satisfies Array<NonNullable<TranscriptionParams["audio_format"]>>);
+  "webm",
+] satisfies Array<AudioFileFormat>);
 /** MIME subtypes, without an `x-` prefix, whose format has another name. */
 const SUBTYPE_FORMATS = new Map([
   ["mpeg", "mp3"],
