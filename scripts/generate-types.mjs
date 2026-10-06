@@ -29,6 +29,7 @@ const KEEP_PATHS = new Set([
   "/v1/models/{model_id}",
   "/v1/images/generations",
   "/v1/images/edits",
+  "/v1/images/{request_id}",
   "/v1/image-generation-models",
   "/v1/image-generation-models/{model_id}",
   "/v1/files",
