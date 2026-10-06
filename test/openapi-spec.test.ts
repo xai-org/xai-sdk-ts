@@ -43,7 +43,9 @@ describe("OpenAPI spec snapshot", () => {
     const result = spawnSync(process.execPath, ["scripts/generate-types.mjs", "--check"], {
       cwd: root,
       encoding: "utf8",
+      timeout: 20_000,
     });
+    expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
   }, 30_000);
 });
