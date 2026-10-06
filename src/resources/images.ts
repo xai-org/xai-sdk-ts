@@ -54,10 +54,10 @@ function toResult(result: SendResult, deferred: boolean | null | undefined): Ima
   return deferred === true ? toStartResponse(result) : toImageResponse(result);
 }
 
-/** A 202 means pending whatever its body says, so a body without `status` still counts. */
+/** A 202 means pending whatever its body says, including a body without `status`. */
 function pendingBody(payload: unknown): Record<string, unknown> {
   const body = typeof payload === "object" && payload !== null && !Array.isArray(payload) ? payload : {};
-  return { status: "pending", ...body };
+  return { ...body, status: "pending" };
 }
 
 export class Images {
