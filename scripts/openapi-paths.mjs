@@ -12,7 +12,6 @@ export const KEEP_PATHS = new Set([
   "/v1/models/{model_id}",
   "/v1/images/generations",
   "/v1/images/edits",
-  "/v1/images/{request_id}",
   "/v1/image-generation-models",
   "/v1/image-generation-models/{model_id}",
   "/v1/files",
@@ -50,6 +49,8 @@ export const IGNORED_PATHS = new Set([
   "/v1/skills",
   "/v1/skills/{skill_id}",
   "/v1/skills/{skill_id}/content",
+  // In the spec but not live as of 2026-10-06.
+  "/v1/images/{request_id}",
 ]);
 
 /** Describes each spec path in neither list or both, and each listed path the spec no longer has. */

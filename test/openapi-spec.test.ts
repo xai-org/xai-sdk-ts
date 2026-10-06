@@ -2,9 +2,8 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, expectTypeOf, it } from "vitest";
-import { KEEP_PATHS, pathProblems } from "../scripts/openapi-paths.mjs";
-import type { paths } from "../src/generated/types.js";
+import { describe, expect, it } from "vitest";
+import { pathProblems } from "../scripts/openapi-paths.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const specText = readFileSync(new URL("../spec/openapi.json", import.meta.url), "utf8");
@@ -15,12 +14,10 @@ describe("OpenAPI spec snapshot", () => {
     expect(pathProblems(specPaths)).toEqual([]);
   });
 
-  it("flags a new endpoint that KEEP_PATHS would otherwise drop", () => {
-    const keep = new Set([...KEEP_PATHS].filter((path) => path !== "/v1/images/{request_id}"));
-    expect(pathProblems(specPaths, keep)).toEqual([
-      "/v1/images/{request_id} is new: add it to KEEP_PATHS to generate its types, or to IGNORED_PATHS if the SDK won't wrap it",
+  it("flags a new endpoint instead of dropping it", () => {
+    expect(pathProblems([...specPaths, "/v1/new-endpoint"])).toEqual([
+      "/v1/new-endpoint is new: add it to KEEP_PATHS to generate its types, or to IGNORED_PATHS if the SDK won't wrap it",
     ]);
-    expectTypeOf<paths>().toHaveProperty("/v1/images/{request_id}");
   });
 
   it("flags paths in both lists and listed paths the spec no longer has", () => {

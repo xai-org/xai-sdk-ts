@@ -210,27 +210,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/images/{request_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * `GET /v1/images/{request_id}`: 202 while pending, 200 with `data` when
-         *     done or with `error` when failed (a failed generation is a body, not an
-         *     HTTP error, so pollers do not retry-storm).
-         */
-        get: operations["handle_get_deferred_image_request"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/language-models": {
         parameters: {
             query?: never;
@@ -4692,58 +4671,6 @@ export interface operations {
             };
             /** @description Unprocessable Entity. There are missing fields in the request body. */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    handle_get_deferred_image_request: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The deferred request id returned by a previous image request. */
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The generation finished. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "request_id": "e5b1b4d4-7b6a-4a0e-9c0d-7f3c7d8a1b2c",
-                     *       "status": "done",
-                     *       "data": [
-                     *         {
-                     *           "url": "..."
-                     *         }
-                     *       ],
-                     *       "usage": {
-                     *         "total_tokens": 0,
-                     *         "image_cost": 2000000
-                     *       }
-                     *     }
-                     */
-                    "application/json": components["schemas"]["GetDeferredImageResponse"];
-                };
-            };
-            /** @description The generation is still pending. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unknown request id or the result has expired. */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
