@@ -1288,7 +1288,7 @@ Create a distributable tarball and SHA-256 checksum in `artifacts/`:
 pnpm pack:artifact
 ```
 
-Generated API types live in `src/generated/types.ts`, speech tags, voice IDs, and voice model IDs in `src/generated/voice.ts`, and the model ID union in `src/models.ts`. Run `pnpm generate:types` for API types, `pnpm generate:voice` for the Voice API values, and `pnpm generate:models` for model IDs instead of editing those files by hand.
+Generated API types live in `src/generated/types.ts`, speech tags, voice IDs, and voice model IDs in `src/generated/voice.ts`, and the model ID union in `src/models.ts`. Run `pnpm generate:types` for API types, `pnpm generate:voice` for the Voice API values, and `pnpm generate:models` for model IDs instead of editing those files by hand. `pnpm generate:types` saves the OpenAPI spec it used to `spec/openapi.json`, and the tests fail if the generated types don't match it.
 
 ## Contributing and security
 
