@@ -1212,6 +1212,22 @@ const inputItems = await client.responses.inputItems.list(stored.id);
 await client.responses.delete(stored.id);
 ```
 
+## Priority processing
+
+Set `service_tier` to `"priority"` or `"fast"` for faster responses at a higher price. The two values are interchangeable: on a model with a fast deployment, both use that deployment and its rates. Otherwise, both schedule the request ahead of standard traffic, which typically lowers latency when demand is high. `response.service_tier` reports the tier that served the request:
+
+```ts
+const response = await client.responses.create({
+  model: "grok-4.7",
+  input: "Explain the Riemann hypothesis in one paragraph.",
+  service_tier: "fast",
+});
+
+console.log(response.service_tier);
+```
+
+See [Priority Processing](https://docs.x.ai/developers/advanced-api-usage/priority-processing) for rates.
+
 ## Pagination
 
 List methods that return results in pages fetch the next page for you in a `for await` loop:

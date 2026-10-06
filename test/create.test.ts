@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { SpaceXAI, SDK_VERSION } from "../src/index.js";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { type CreateParams, SpaceXAI, SDK_VERSION } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch, usageFixture } from "./helpers.js";
 
 function client(fetch: typeof globalThis.fetch): SpaceXAI {
@@ -111,6 +111,19 @@ describe("responses.create", () => {
     );
     const res = await client(fetch).responses.create(createBody);
     expect(res.usage.cost_usd).toBe(1.2345678901);
+  });
+
+  it("sends service_tier fast and reads back the tier that served the request", async () => {
+    const { fetch, captured } = mockFetch(() =>
+      jsonResponse({ ...completedResponse, service_tier: "fast" }),
+    );
+    const res = await client(fetch).responses.create({ ...createBody, service_tier: "fast" });
+    const body = (await captured.requests[0]?.json()) as { service_tier?: unknown };
+
+    expect(body.service_tier).toBe("fast");
+    expect(res.service_tier).toBe("fast");
+    expectTypeOf<"fast">().toExtend<NonNullable<CreateParams["service_tier"]>>();
+    expectTypeOf<"fast">().toExtend<NonNullable<typeof res.service_tier>>();
   });
 
   it("returns raw body when http.body is true", async () => {

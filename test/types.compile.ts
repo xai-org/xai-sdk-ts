@@ -36,6 +36,12 @@ export type ReasoningEffortIsOptional = Assert<IsOptional<ReasoningConfig, "effo
 export type SearchDefaultsAreOptional = Assert<
   IsOptional<SearchParameters, "max_search_results">
 >;
+export type FastIsAServiceTier = Assert<
+  "fast" extends NonNullable<CreateParams["service_tier"]> ? true : false
+>;
+export type ResponsesReportTheServiceTier = Assert<
+  "fast" extends NonNullable<ModelResponse["service_tier"]> ? true : false
+>;
 export type MessageHasLiteralType = Assert<
   OutputMessage["type"] extends "message" ? true : false
 >;
@@ -104,7 +110,15 @@ export const requestExamples = [
     input: "Search within this date range.",
     search_parameters: { from_date: "2026-01-01" },
   },
+  {
+    model: "grok-4.7",
+    input: "Answer quickly.",
+    service_tier: "fast",
+  },
 ] satisfies Array<CreateParams>;
+
+// @ts-expect-error service_tier only accepts the documented tiers.
+export const unknownServiceTier: CreateParams = { model: "grok-4.7", input: "Hi", service_tier: "turbo" };
 
 export const toolExamples = [
   { type: "web_search" },
