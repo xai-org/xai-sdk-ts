@@ -1,7 +1,13 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { operations, paths } from "../src/generated/types.js";
 import type { ImageEditWireBody } from "../src/porcelain.js";
-import { type DeferredImageResponse, type ImageGenerateParams, SpaceXAI } from "../src/index.js";
+import {
+  type DeferredImageEditParams,
+  type DeferredImageGenerateParams,
+  type DeferredImageResponse,
+  type ImageGenerateParams,
+  SpaceXAI,
+} from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
 type ListQuery = NonNullable<operations["handle_list_input_items"]["parameters"]["query"]>;
@@ -49,9 +55,9 @@ describe("OpenAPI image request contract", () => {
   });
 
   it("deferred and output match the documented request fields", () => {
-    expectTypeOf<ImageGenerateParams["deferred"]>().toEqualTypeOf<GenerateImageBody["deferred"]>();
+    expectTypeOf<DeferredImageGenerateParams>().toExtend<GenerateImageBody>();
+    expectTypeOf<DeferredImageEditParams["deferred"]>().toExtend<EditImageBody["deferred"]>();
     expectTypeOf<ImageGenerateParams["output"]>().toEqualTypeOf<GenerateImageBody["output"]>();
-    expectTypeOf<ImageEditWireBody["deferred"]>().toEqualTypeOf<EditImageBody["deferred"]>();
     expectTypeOf<ImageEditWireBody["output"]>().toEqualTypeOf<EditImageBody["output"]>();
   });
 });

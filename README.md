@@ -803,6 +803,8 @@ if (result.status === "done") {
 
 `wait()` resolves once the status is no longer `pending`: `done`, with `data` and `usage`, or `failed`, with an `error` that has a `code` and `message`. It polls every second for up to 5 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the request, and the API has no way to cancel one. To check once without waiting, call `client.images.get(request_id)`, which returns `status: "pending"` until the images are ready. A `request_id` that's unknown or whose result has expired rejects with `NotFoundError`. Deferred requests support only the default `response_format: "url"`.
 
+To build deferred params ahead of time, type them as `DeferredImageGenerateParams` or `DeferredImageEditParams`, so that `generate()` and `edit()` resolve to a `request_id`.
+
 To store images in your own bucket instead of with SpaceXAI, pass `output.upload_urls`: signed URLs that accept an HTTP `PUT`, one per image. Each image is uploaded to its URL, and its `url` in the result is that upload URL. This works with or without `deferred`, but Zero Data Retention teams must set it to use `deferred`:
 
 ```ts

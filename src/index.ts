@@ -68,6 +68,8 @@ export type {
   CustomVoiceCreateParams,
   CustomVoiceList,
   CustomVoiceUpdateParams,
+  DeferredImageEditParams,
+  DeferredImageGenerateParams,
   DeferredImageResponse,
   DeletedFile,
   DeletedResponse,

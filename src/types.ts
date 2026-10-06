@@ -134,11 +134,6 @@ type ImageRequestFields = {
   /** Defaults to `auto`. Only supported by `grok-imagine-image-2.0`. */
   quality?: "low" | "medium" | "auto" | null;
   /**
-   * Return a `request_id` right away and generate in the background. Poll for the result with
-   * `images.wait()` or `images.get()`. Deferred requests support only `response_format: "url"`.
-   */
-  deferred?: boolean | null;
-  /**
    * Upload each image with HTTP PUT to the matching signed URL in `upload_urls`, one per image, instead of
    * storing it with SpaceXAI. Each image's `url` is then its upload URL. Requires `response_format: "url"`.
    * Zero Data Retention teams must set this to use `deferred`.
@@ -146,15 +141,15 @@ type ImageRequestFields = {
   output?: Schema["ImageOutput"] | null;
 };
 
-export type ImageGenerateParams = Omit<
-  Schema["GenerateImageRequest"],
-  keyof ImageRequestFields
-> &
+/** `deferred` changes what `images.generate()` and `images.edit()` resolve to, so it has its own params types. */
+type OmittedImageFields = keyof ImageRequestFields | "deferred";
+
+export type ImageGenerateParams = Omit<Schema["GenerateImageRequest"], OmittedImageFields> &
   ImageRequestFields;
 
 export type ImageEditParams = Omit<
   Schema["EditImageRequest"],
-  keyof ImageRequestFields | "image" | "images"
+  OmittedImageFields | "image" | "images"
 > &
   ImageRequestFields &
   (
@@ -165,6 +160,19 @@ export type ImageEditParams = Omit<
         image?: never;
       }
   );
+
+type DeferredField = {
+  /**
+   * Return a `request_id` right away and generate in the background. Poll for the result with
+   * `images.wait()` or `images.get()`. Deferred requests support only `response_format: "url"`.
+   */
+  deferred: true;
+};
+
+/** `images.generate()` params that resolve to a `request_id` instead of the images. */
+export type DeferredImageGenerateParams = ImageGenerateParams & DeferredField;
+/** `images.edit()` params that resolve to a `request_id` instead of the images. */
+export type DeferredImageEditParams = ImageEditParams & DeferredField;
 
 export type GeneratedImage = Schema["GeneratedImage"];
 export type ImageResponse = Omit<Schema["GeneratedImageResponse"], "usage"> & {

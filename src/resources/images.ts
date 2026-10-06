@@ -4,6 +4,8 @@ import { inlineImageInputs } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
 import { pollUntil, requireRecord } from "./shared.js";
 import type {
+  DeferredImageEditParams,
+  DeferredImageGenerateParams,
   DeferredImageResponse,
   HttpMeta,
   ImageEditParams,
@@ -18,8 +20,8 @@ import type { SpaceXAI } from "../client.js";
 const DEFAULT_WAIT_INTERVAL_MS = 1_000;
 const DEFAULT_WAIT_TIMEOUT_MS = 300_000;
 
-type Deferred = { deferred: true };
 type NotDeferred = { deferred?: false | null };
+type MaybeDeferred = { deferred?: boolean | null };
 type ImageStart = ImageStartResponse & { http: HttpMeta };
 
 function toImageResponse(result: SendResult): ImageResponse {
@@ -55,11 +57,14 @@ function toResult(result: SendResult, deferred: boolean | null | undefined): Ima
 export class Images {
   constructor(private readonly client: SpaceXAI) {}
 
-  /** With `deferred: true`, resolves to a `request_id` for `wait()` or `get()` instead of the images. */
-  generate(body: ImageGenerateParams & Deferred, opts?: RequestOpts): Promise<ImageStart>;
   generate(body: ImageGenerateParams & NotDeferred, opts?: RequestOpts): Promise<ImageResponse>;
-  generate(body: ImageGenerateParams, opts?: RequestOpts): Promise<ImageResponse | ImageStart>;
-  async generate(body: ImageGenerateParams, opts?: RequestOpts): Promise<ImageResponse | ImageStart> {
+  /** Resolves to a `request_id` right away. Poll it with `wait()` or `get()`. */
+  generate(body: DeferredImageGenerateParams, opts?: RequestOpts): Promise<ImageStart>;
+  generate(body: ImageGenerateParams & MaybeDeferred, opts?: RequestOpts): Promise<ImageResponse | ImageStart>;
+  async generate(
+    body: ImageGenerateParams & MaybeDeferred,
+    opts?: RequestOpts,
+  ): Promise<ImageResponse | ImageStart> {
     const result = await send(this.client, {
       method: "POST",
       path: "/images/generations",
@@ -69,11 +74,11 @@ export class Images {
     return toResult(result, body.deferred);
   }
 
-  /** With `deferred: true`, resolves to a `request_id` for `wait()` or `get()` instead of the images. */
-  edit(body: ImageEditParams & Deferred, opts?: RequestOpts): Promise<ImageStart>;
   edit(body: ImageEditParams & NotDeferred, opts?: RequestOpts): Promise<ImageResponse>;
-  edit(body: ImageEditParams, opts?: RequestOpts): Promise<ImageResponse | ImageStart>;
-  async edit(body: ImageEditParams, opts?: RequestOpts): Promise<ImageResponse | ImageStart> {
+  /** Resolves to a `request_id` right away. Poll it with `wait()` or `get()`. */
+  edit(body: DeferredImageEditParams, opts?: RequestOpts): Promise<ImageStart>;
+  edit(body: ImageEditParams & MaybeDeferred, opts?: RequestOpts): Promise<ImageResponse | ImageStart>;
+  async edit(body: ImageEditParams & MaybeDeferred, opts?: RequestOpts): Promise<ImageResponse | ImageStart> {
     const payload = await inlineImageInputs(body, opts?.signal);
     const result = await send(this.client, {
       method: "POST",

@@ -87,6 +87,7 @@ try {
       SpaceXAI,
       isImageGenerationCall,
       type CreateParams,
+      type DeferredImageGenerateParams,
       type DeferredImageResponse,
       type DeletedResponse,
       type ImageEditParams,
@@ -132,11 +133,9 @@ try {
       images: [new Blob(["png"], { type: "image/png" }), { file_id: "file_1" }],
     };
     const imageResponse: ImageResponse | null = null;
-    const deferredStart: Promise<ImageStartResponse> = client.images.generate({
-      ...generate,
-      response_format: "url",
-      deferred: true,
-    });
+    const images: Promise<ImageResponse> = client.images.generate(generate);
+    const deferredParams: DeferredImageGenerateParams = { ...generate, response_format: "url", deferred: true };
+    const deferredStart: Promise<ImageStartResponse> = client.images.generate(deferredParams);
     const imageWait: ImageWaitOptions = { interval: 1_000 };
     const deferredImage: Promise<DeferredImageResponse> = client.images.wait("request_id", imageWait);
     const imageTool: Tool = { type: "image_generation" };
@@ -146,7 +145,7 @@ try {
     // @ts-expect-error Unknown speech tags are type errors in string literals.
     void client.voice.speak({ text: "Hi [luff] there.", language: "en" });
     void [model, futureModel, deleted, functionTool, webSearchTool, params, client, xSearchTool];
-    void [imageModel, generate, edit, imageResponse, deferredStart, deferredImage, imageTool, imageCalls];
+    void [imageModel, generate, edit, imageResponse, images, deferredStart, deferredImage, imageTool, imageCalls];
   `);
   await writeFile(
     path.join(TEMP, "tsconfig.json"),
