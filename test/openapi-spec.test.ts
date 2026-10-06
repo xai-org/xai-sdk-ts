@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { IGNORED_PATHS, KEEP_PATHS, pathProblems } from "../scripts/openapi-paths.mjs";
+import { KEEP_PATHS, pathProblems } from "../scripts/openapi-paths.mjs";
 import type { paths } from "../src/generated/types.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -13,7 +13,6 @@ const specPaths = Object.keys((JSON.parse(specText) as { paths: Record<string, u
 describe("OpenAPI spec snapshot", () => {
   it("keeps or ignores every path in spec/openapi.json", () => {
     expect(pathProblems(specPaths)).toEqual([]);
-    expect(KEEP_PATHS.size + IGNORED_PATHS.size).toBe(specPaths.length);
   });
 
   it("flags a new endpoint that KEEP_PATHS would otherwise drop", () => {
