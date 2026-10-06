@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import type { KnownModelId, ModelId } from "../src/models.js";
-import type { CreateParams } from "../src/types.js";
+import type { KnownModelId, KnownVideoModelId, ModelId } from "../src/models.js";
+import type { CreateParams, VideoGenerateParams } from "../src/types.js";
 
 describe("model IDs", () => {
   it("preserves known model string literals", () => {
@@ -22,5 +22,13 @@ describe("model IDs", () => {
     // @ts-expect-error KnownModelId only accepts generated model IDs.
     const model: KnownModelId = "not-an-xai-model";
     expect(model).toBe("not-an-xai-model");
+  });
+
+  it("preserves known video model string literals", () => {
+    const model = "grok-imagine-video-1.5-lite" satisfies KnownVideoModelId;
+    const params = { model, prompt: "A lighthouse at dusk" } satisfies VideoGenerateParams;
+
+    expect(params.model).toBe("grok-imagine-video-1.5-lite");
+    expectTypeOf(params.model).toEqualTypeOf<"grok-imagine-video-1.5-lite">();
   });
 });
