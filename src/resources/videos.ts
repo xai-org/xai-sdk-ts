@@ -1,8 +1,8 @@
-import { combineSignals, send, sleep, type SendResult } from "../http.js";
-import { APIProtocolError, TimeoutError, requestIds } from "../errors.js";
+import { send, type SendResult } from "../http.js";
+import { APIProtocolError, requestIds } from "../errors.js";
 import { inlineImageInput, inlineVideoInput } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
-import { requireRecord } from "./shared.js";
+import { pollUntil, requireRecord } from "./shared.js";
 import type { components } from "../generated/types.js";
 import type {
   HttpMeta,
@@ -126,22 +126,11 @@ export class Videos {
    * `TimeoutError` while the request keeps running on the server.
    */
   async wait(requestId: string, opts: VideoWaitOptions = {}): Promise<VideoResponse> {
-    const { interval = DEFAULT_WAIT_INTERVAL_MS, timeout = DEFAULT_WAIT_TIMEOUT_MS } = opts;
-    const deadline = new AbortController();
-    const timer = setTimeout(() => {
-      deadline.abort(
-        new TimeoutError(`Video request ${requestId} did not finish within ${timeout}ms`),
-      );
-    }, timeout);
-    const signal = combineSignals([opts.signal, deadline.signal]);
-    try {
-      while (true) {
-        const result = await this.get(requestId, { signal });
-        if (result.status !== "pending") return result;
-        await sleep(interval, signal);
-      }
-    } finally {
-      clearTimeout(timer);
-    }
+    const { interval = DEFAULT_WAIT_INTERVAL_MS, timeout = DEFAULT_WAIT_TIMEOUT_MS, signal } = opts;
+    return pollUntil(
+      (pollSignal) => this.get(requestId, { signal: pollSignal }),
+      (result) => result.status !== "pending",
+      { interval, timeout, signal, label: `Video request ${requestId}` },
+    );
   }
 }
