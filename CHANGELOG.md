@@ -9,6 +9,11 @@ All notable changes to the SpaceXAI TypeScript SDK will be documented in this fi
 - `deferred: true` on `images.generate()` and `images.edit()` returns a `request_id` right away. `images.wait()` polls it until the images are ready, and `images.get()` checks it once.
 - `output.upload_urls` on image requests uploads each image to a signed URL that you provide.
 - `service_tier: "fast"`, which is interchangeable with `"priority"` and uses a model's fast deployment where it has one.
+- `grok-imagine-video-1.5-lite` in `KnownVideoModelId`.
+
+### Changed
+
+- Updated the API types to the current OpenAPI spec. The `max_output_tokens` doc comment now says that it limits only visible output tokens, as the API does: reasoning and function call tokens don't count toward it.
 
 ## [0.2.2] - 2026-10-05
 
