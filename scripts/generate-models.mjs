@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Writes src/models.ts from the public HTTP docs catalog.
+ * Writes src/models.ts from the public HTTP docs catalog, plus aliases that other docs pages give.
  * Default: https://docs.x.ai/developers/models.md
  */
 
@@ -13,6 +13,8 @@ const ROOT = path.join(fileURLToPath(new URL("..", import.meta.url)));
 const OUT = path.join(ROOT, "src/models.ts");
 const DEFAULT_URL = "https://docs.x.ai/developers/models.md";
 const UA = "Mozilla/5.0 (compatible; xai-sdk-ts/0.1)";
+/** The catalog lists dated IDs only. The multi-agent guide names the model `grok-4.20-multi-agent`. */
+const LANGUAGE_MODEL_ALIASES = ["grok-4.20-multi-agent"];
 
 function modelsUrl() {
   return process.env.XAI_MODELS_URL ?? DEFAULT_URL;
@@ -89,10 +91,11 @@ async function main() {
     throw new Error(`GET ${url} failed: ${response.status} ${response.statusText}`);
   }
   const markdown = await response.text();
-  const ids = collectIds(markdown, isLanguageModelId);
-  if (ids.length === 0) {
+  const catalogIds = collectIds(markdown, isLanguageModelId);
+  if (catalogIds.length === 0) {
     throw new Error(`no language model ids found in ${url}`);
   }
+  const ids = [...new Set([...catalogIds, ...LANGUAGE_MODEL_ALIASES])].sort();
   const imageIds = collectIds(markdown, isImageModelId);
   if (imageIds.length === 0) {
     throw new Error(`no image model ids found in ${url}`);

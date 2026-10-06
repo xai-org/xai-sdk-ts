@@ -11,6 +11,13 @@ describe("model IDs", () => {
     expectTypeOf(params.model).toEqualTypeOf<"grok-4.6">();
   });
 
+  it("knows the grok-4.20-multi-agent alias as well as its dated ID", () => {
+    const models = ["grok-4.20-multi-agent", "grok-4.20-multi-agent-0309"] satisfies Array<KnownModelId>;
+
+    expect(models).toHaveLength(2);
+    expectTypeOf<"grok-4.20-multi-agent">().toExtend<KnownModelId>();
+  });
+
   it("accepts model IDs released after the SDK", () => {
     const model = "grok-released-after-this-sdk" satisfies ModelId;
     const params = { model, input: "hello" } satisfies CreateParams;

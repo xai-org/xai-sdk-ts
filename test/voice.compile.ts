@@ -12,6 +12,7 @@ import type {
   UnsafeSpeechText,
   SpaceXAI,
   BinaryResponse,
+  Voice,
 } from "../src/index.js";
 import type { SpeechText } from "../src/speech-tags.js";
 
@@ -41,22 +42,39 @@ export type CustomVoiceFileIsRequired = Assert<
 >;
 
 export async function speechTagChecks(client: SpaceXAI) {
-  await client.voice.speak({ text: "Hi [gasp] there." as UnsafeSpeechText, language: "en" });
-  // @ts-expect-error `[luff]` is not a speech tag.
-  await client.voice.speak({ text: "Hi [luff] there.", language: "en" });
+  await client.voice.speak({ text: "Hi [new-tag] there." as UnsafeSpeechText, language: "en" });
+  await client.voice.speak({ text: "They said [they] would come.", language: "en" });
+  // @ts-expect-error `[laff]` is not a speech tag.
+  await client.voice.speak({ text: "Hi [laff] there.", language: "en" });
+  // @ts-expect-error Markup is not a speech tag.
+  await client.voice.speak({ text: 'Grok said so.<citation id="web:23"/>', language: "en" });
 }
 
 type Newer = " For a tag newer than this SDK, add `as UnsafeSpeechText` to the text.";
 
 export type SpeechTagMessages = [
-  Assert<Equals<SpeechText<"Hi [luff] there.">, `Unknown speech tag [luff], did you mean [laugh]?${Newer}`>>,
+  Assert<Equals<SpeechText<"Hi [laff] there.">, `Unknown speech tag [laff], did you mean [laugh]?${Newer}`>>,
   Assert<
     Equals<
-      SpeechText<"Hi [luff] there. <wisper>Quiet.</wisper>">,
-      `Unknown speech tag [luff], did you mean [laugh]? Unknown speech tag <wisper>, did you mean <whisper>?${Newer}`
+      SpeechText<"Hi [laff] there. <wisper>Quiet.</wisper>">,
+      `Unknown speech tag [laff], did you mean [laugh]? Unknown speech tag <wisper>, did you mean <whisper>?${Newer}`
     >
   >,
-  Assert<Equals<SpeechText<"Then the [music] started.">, `Unknown speech tag [music].${Newer}`>>,
+  Assert<Equals<SpeechText<"Then a [door-creak] sounded.">, `Unknown speech tag [door-creak].${Newer}`>>,
+  Assert<
+    Equals<
+      SpeechText<"Ha [laughs], [sighing], [long-paws].">,
+      `Unknown speech tag [laughs], did you mean [laugh]? Unknown speech tag [sighing], did you mean [sigh]? Unknown speech tag [long-paws], did you mean [long-pause]?${Newer}`
+    >
+  >,
+  Assert<
+    Equals<
+      SpeechText<"They said [they] would bring [them] to [the] show.">,
+      "They said [they] would bring [them] to [the] show."
+    >
+  >,
+  Assert<Equals<SpeechText<"He said it was fine [sic].">, "He said it was fine [sic].">>,
+  Assert<Equals<SpeechText<"Then the [music] started.">, "Then the [music] started.">>,
   Assert<
     Equals<SpeechText<"<lower>Listen.</lower>">, `Unknown speech tag <lower>, did you mean <lower-pitch>?${Newer}`>
   >,
@@ -65,6 +83,24 @@ export type SpeechTagMessages = [
   Assert<Equals<SpeechText<"<whisper>It is a secret.">, "<whisper> is never closed.">>,
   Assert<Equals<SpeechText<"It is a secret.</whisper>">, "</whisper> has no opening tag.">>,
   Assert<Equals<SpeechText<"<slow><soft>Goodnight.</slow></soft>">, "Close <soft> before </slow>.">>,
+  Assert<
+    Equals<
+      SpeechText<'Grok said so.<citation id="web:23"/> <b>Bold</b> </grok:render>'>,
+      `<citation id="web:23"/> is not a speech tag. Unknown speech tag <b>. </grok:render> is not a speech tag.${Newer}`
+    >
+  >,
+  Assert<
+    Equals<
+      SpeechText<'<whisper volume="low">Quiet.</whisper> <pause/>'>,
+      '<whisper volume="low"> is not a speech tag. </whisper> has no opening tag. <pause/> is not a speech tag.'
+    >
+  >,
+  Assert<
+    Equals<
+      SpeechText<"Visit <https://x.ai> or write to <support@x.ai>. If a < b and c > d, then <3.">,
+      "Visit <https://x.ai> or write to <support@x.ai>. If a < b and c > d, then <3."
+    >
+  >,
   Assert<
     Equals<
       SpeechText<"<slow><soft>Goodnight.</soft></slow> [pause] Press [Enter] [1] [citation needed].">,
@@ -110,4 +146,34 @@ export const clientSecretExamples = [
   {},
   { expires_after: { seconds: 300 }, session: null },
   { session: { model: "grok-voice-think-fast-2.0", reasoning: { effort: "high" } } },
+  {
+    session: {
+      instructions: "You are a helpful assistant.",
+      turn_detection: { type: "server_vad", idle_timeout_ms: 10_000 },
+    },
+  },
+  { session: { turn_detection: { type: null } } },
+  { session: { turn_detection: null } },
 ] satisfies Array<ClientSecretCreateParams>;
+
+type Session = NonNullable<ClientSecretCreateParams["session"]>;
+type TurnDetection = NonNullable<Session["turn_detection"]>;
+
+export type SessionInstructionsAreText = Assert<Equals<Session["instructions"], string | undefined>>;
+export type TurnDetectionTypeAutocompletes = Assert<
+  Equals<TurnDetection["type"], "server_vad" | (string & {}) | null | undefined>
+>;
+
+export const wrongInstructions: ClientSecretCreateParams = {
+  // @ts-expect-error `instructions` is the system prompt text.
+  session: { instructions: ["You are a helpful assistant."] },
+};
+
+export type VoiceGenderIsOptional = Assert<IsOptional<Voice, "gender">>;
+
+export const builtInVoices = [
+  { voice_id: "eve", name: "Eve", language: "en", gender: "female" },
+  { voice_id: "rex", name: "Rex", language: "en", gender: "male" },
+  { voice_id: "voice-added-later", name: "Later", gender: "label-added-later" },
+  { voice_id: "sal", name: "Sal", gender: null },
+] satisfies Array<Voice>;

@@ -1,6 +1,6 @@
 import { combineSignals, send, sleep, type SendResult } from "../http.js";
 import { APIProtocolError, TimeoutError, requestIds } from "../errors.js";
-import { inlineImageInput, inlineVideoInput } from "../porcelain.js";
+import { inlineMediaUrls, inlineVideoInput } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
 import { requireRecord } from "./shared.js";
 import type { components } from "../generated/types.js";
@@ -21,28 +21,6 @@ type GenerateVideoRequest = components["schemas"]["GenerateVideoRequest"];
 const DEFAULT_WAIT_INTERVAL_MS = 5_000;
 const DEFAULT_WAIT_TIMEOUT_MS = 600_000;
 
-async function inlineImages(
-  body: VideoGenerateParams,
-  signal?: AbortSignal,
-): Promise<GenerateVideoRequest> {
-  const { image, reference_images, keyframes, ...rest } = body;
-  const out: GenerateVideoRequest = rest;
-  if (image != null) out.image = await inlineImageInput(image, signal);
-  if (reference_images != null) {
-    out.reference_images = [];
-    for (const item of reference_images) {
-      out.reference_images.push(await inlineImageInput(item, signal));
-    }
-  }
-  if (keyframes != null) {
-    out.keyframes = [];
-    for (const keyframe of keyframes) {
-      out.keyframes.push({ ...keyframe, image: await inlineImageInput(keyframe.image, signal) });
-    }
-  }
-  return out;
-}
-
 function toStartResponse(result: SendResult): VideoStartResponse & { http: HttpMeta } {
   const body = requireRecord(result.payload, result.http, "Video start response");
   if (typeof body.request_id !== "string" || body.request_id.length === 0) {
@@ -61,7 +39,7 @@ export class Videos {
     body: VideoGenerateParams,
     opts?: RequestOpts,
   ): Promise<VideoStartResponse & { http: HttpMeta }> {
-    const payload = await inlineImages(body, opts?.signal);
+    const payload: GenerateVideoRequest = await inlineMediaUrls(body, opts?.signal);
     const result = await send(this.client, {
       method: "POST",
       path: "/videos/generations",

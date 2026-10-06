@@ -22,6 +22,40 @@ import type {
 import type { VoiceId } from "../generated/voice.js";
 import type { SpaceXAI } from "../client.js";
 
+const AUDIO_FORMATS = new Set<string>([
+  "pcm",
+  "mulaw",
+  "alaw",
+  "wav",
+  "mp3",
+  "ogg",
+  "opus",
+  "flac",
+  "aac",
+  "mp4",
+  "m4a",
+  "mkv",
+] satisfies Array<NonNullable<TranscriptionParams["audio_format"]>>);
+/** MIME subtypes, without an `x-` prefix, whose format has another name. */
+const SUBTYPE_FORMATS = new Map([
+  ["mpeg", "mp3"],
+  ["wave", "wav"],
+  ["matroska", "mkv"],
+]);
+
+/**
+ * The API can read the audio format from the file name, which FormData sets to `blob` for a `Blob`
+ * without one. For such a Blob, returns a name such as `audio.mp3` from its MIME type, unless
+ * `audio_format` is set.
+ */
+function audioFileName(file: Blob, audioFormat: unknown): string | undefined {
+  if (audioFormat !== undefined || (file instanceof File && file.name)) return undefined;
+  const essence = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
+  const subtype = essence.split("/")[1]?.replace(/^x-/, "") ?? "";
+  const format = SUBTYPE_FORMATS.get(subtype) ?? subtype;
+  return AUDIO_FORMATS.has(format) ? `audio.${format}` : undefined;
+}
+
 /** Fields sent after `file` may be ignored, so `file` is appended last. */
 function toFormData({ file, ...fields }: { file?: Blob } & Record<string, unknown>): FormData {
   const form = new FormData();
@@ -30,7 +64,11 @@ function toFormData({ file, ...fields }: { file?: Blob } & Record<string, unknow
       if (item !== undefined) form.append(name, String(item));
     }
   }
-  if (file) form.append("file", file);
+  if (file) {
+    const filename = audioFileName(file, fields.audio_format);
+    if (filename === undefined) form.append("file", file);
+    else form.append("file", file, filename);
+  }
   return form;
 }
 

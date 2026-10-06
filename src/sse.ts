@@ -1,9 +1,14 @@
+import { DEFAULT_MAX_RESPONSE_BODY_BYTES } from "./constants.js";
+
 const SSE_DONE = "[DONE]";
-export const MAX_SSE_EVENT_CHARS = 1_048_576;
+/** A blank line ends an event, so a delimiter is at most four characters, as in `\r\n\r\n`. */
+const EVENT_DELIMITER = /(?:\r\n|\r|\n)(?:\r\n|\r|\n)/;
 
 type ParseSseOptions = {
   onBytes?: () => void;
   closeSignal?: AbortSignal;
+  /** Longest event in characters, which bounds the buffered text. 0 turns the limit off. */
+  maxEventChars?: number;
 };
 
 /**
@@ -14,9 +19,12 @@ export async function* parseSse(
   body: ReadableStream<Uint8Array>,
   opts: ParseSseOptions = {},
 ): AsyncGenerator<unknown> {
+  const maxChars = opts.maxEventChars ?? DEFAULT_MAX_RESPONSE_BODY_BYTES;
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
+  // The last characters of `buf`, where a delimiter that the next chunk completes would start.
+  let bufEnd = "";
   try {
     while (true) {
       const chunk = await readChunk(reader, opts.closeSignal);
@@ -24,10 +32,8 @@ export async function* parseSse(
       const { done, value } = chunk;
       if (value && value.byteLength > 0) opts.onBytes?.();
       if (done) {
-        const flushed = flushBlocks(buf + decoder.decode());
-        if (flushed.rest.length > MAX_SSE_EVENT_CHARS) {
-          throw new Error(`SSE event exceeds ${MAX_SSE_EVENT_CHARS} characters`);
-        }
+        const flushed = flushBlocks(buf + decoder.decode(), maxChars);
+        assertEventSize(flushed.rest, maxChars);
         for (const item of flushed.items) {
           if (item === SSE_DONE) return;
           yield item;
@@ -39,12 +45,19 @@ export async function* parseSse(
         }
         return;
       }
-      buf += decoder.decode(value, { stream: true });
-      const { items, rest } = flushBlocks(buf);
-      buf = rest;
-      if (buf.length > MAX_SSE_EVENT_CHARS) {
-        throw new Error(`SSE event exceeds ${MAX_SSE_EVENT_CHARS} characters`);
+      const text = decoder.decode(value, { stream: true });
+      // Splitting the whole buffer for every chunk would make reading a long event quadratic.
+      const recent = bufEnd + text;
+      buf += text;
+      bufEnd = recent.slice(-3);
+      if (!EVENT_DELIMITER.test(recent)) {
+        assertEventSize(buf, maxChars);
+        continue;
       }
+      const { items, rest } = flushBlocks(buf, maxChars);
+      buf = rest;
+      bufEnd = rest.slice(-3);
+      assertEventSize(buf, maxChars);
       for (const item of items) {
         if (item === SSE_DONE) return;
         yield item;
@@ -95,14 +108,18 @@ async function readChunk(
   });
 }
 
-function flushBlocks(buf: string): { items: Array<unknown>; rest: string } {
-  const parts = buf.split(/(?:\r\n|\r|\n)(?:\r\n|\r|\n)/);
+function assertEventSize(text: string, maxChars: number): void {
+  if (maxChars > 0 && text.length > maxChars) {
+    throw new Error(`SSE event exceeds ${maxChars} characters`);
+  }
+}
+
+function flushBlocks(buf: string, maxChars: number): { items: Array<unknown>; rest: string } {
+  const parts = buf.split(EVENT_DELIMITER);
   const rest = parts.pop() ?? "";
   const items: Array<unknown> = [];
   for (const block of parts) {
-    if (block.length > MAX_SSE_EVENT_CHARS) {
-      throw new Error(`SSE event exceeds ${MAX_SSE_EVENT_CHARS} characters`);
-    }
+    assertEventSize(block, maxChars);
     const parsed = parseBlock(block);
     if (parsed !== undefined) items.push(parsed);
   }

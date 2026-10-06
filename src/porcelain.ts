@@ -121,6 +121,19 @@ function sniffImageType(bytes: Uint8Array): string {
   return "application/octet-stream";
 }
 
+/** Video generation takes images and reference audio, which is usually WAV or MP3. */
+function sniffMediaType(bytes: Uint8Array): string {
+  const image = sniffImageType(bytes);
+  if (image !== "application/octet-stream") return image;
+  if (hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && hasBytes(bytes, 8, [0x57, 0x41, 0x56, 0x45])) {
+    return "audio/wav";
+  }
+  if (hasBytes(bytes, 0, [0x49, 0x44, 0x33]) || (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0)) {
+    return "audio/mpeg";
+  }
+  return "application/octet-stream";
+}
+
 async function blobToDataUrl(
   blob: Blob,
   signal?: AbortSignal,
@@ -179,6 +192,44 @@ export async function inlineImageInput(
   signal?: AbortSignal,
 ): Promise<Exclude<ImageInput, Blob>> {
   return isBlobLike(image) ? { url: await blobToDataUrl(image, signal) } : image;
+}
+
+/** A request body whose `Blob` and `File` values are `{ url }` data URLs. */
+export type MediaUrls<T> = T extends Blob
+  ? { url: string }
+  : T extends string | number | boolean | null | undefined
+    ? T
+    : T extends ReadonlyArray<infer Item>
+      ? Array<MediaUrls<Item>>
+      : { [K in keyof T]: MediaUrls<T[K]> };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+async function inlineMediaValue(value: unknown, signal?: AbortSignal): Promise<unknown> {
+  assertNotAborted(signal);
+  if (isBlobLike(value)) return { url: await blobToDataUrl(value, signal, sniffMediaType) };
+  if (Array.isArray(value)) {
+    const out = [];
+    for (const item of value) out.push(await inlineMediaValue(item, signal));
+    return out;
+  }
+  // Other objects, such as a URL, keep their own JSON form.
+  if (!isPlainObject(value)) return value;
+  const next: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(value)) {
+    if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
+    next[k] = await inlineMediaValue(v, signal);
+  }
+  return next;
+}
+
+/** Converts every `Blob` or `File` in a request body, however deeply nested, to a `{ url }` data URL. */
+export async function inlineMediaUrls<T>(body: T, signal?: AbortSignal): Promise<MediaUrls<T>> {
+  return (await inlineMediaValue(body, signal)) as MediaUrls<T>;
 }
 
 /** The API accepts only MP4 source videos, so an untyped Blob is sent as `video/mp4`. */

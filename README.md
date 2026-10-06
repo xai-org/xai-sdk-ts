@@ -841,7 +841,7 @@ if (result.status === "done") {
 
 `wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the job: the video keeps generating and is billed when it finishes. The API has no way to cancel a video yet. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
 
-To animate a still image, pass it as `image`. `image`, `reference_images`, and keyframe images accept a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
+To animate a still image, pass it as `image`, and pass `last_frame` to choose the frame the video ends on. `image`, `last_frame`, `reference_images`, and keyframe images accept a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
 
 ```ts
 import { openAsBlob } from "node:fs";
@@ -852,6 +852,8 @@ const { request_id } = await client.videos.generate({
   image: await openAsBlob("./waterfall.png"),
 });
 ```
+
+Models that support reference-to-video generation also take up to three `reference_audios`. Each is a preset voice such as `{ voice_id: "ara" }`, which autocompletes the built-in voices, or a clip of up to 15 seconds as `{ url }` or a `Blob` or `File`. The SDK detects WAV or MP3 in a `Blob` or `File` without a MIME type.
 
 Edit a video with `edit()`, or continue it from its last frame with `extend()`. Both return a `request_id` for `wait()`. The source `video` must be an MP4, given as a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request. For extensions, `duration` sets the length of the new segment only:
 
@@ -961,7 +963,7 @@ await client.batches.requests.add(batch.batch_id, {
 
 Each `batch_request` holds one request. `responses` takes the same `CreateParams` as `client.responses.create()`, including the `store: false` default, and its result comes back as a `chat_get_completion` response. `image_generation`, `image_edit`, `video_generation`, and `video_extension` take the request body of the matching REST endpoint. Results can come back in any order, so give each request a `batch_request_id` that is unique within the batch. Not every model accepts batch requests; each [model page](https://docs.x.ai/developers/models) lists its Batch API support.
 
-Wait until no requests are pending, then read the results:
+Wait until every request has finished, then read the results:
 
 ```ts
 await client.batches.wait(batch.batch_id);
@@ -975,7 +977,7 @@ for await (const { batch_request_id, batch_result } of client.batches.results(ba
 }
 ```
 
-`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
+`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. A batch created from `input_file_id` has no requests until it has loaded the file, so `wait()` keeps polling a batch without requests until requests arrive, or until the batch is cancelled or expires. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
 
 ## Voice
 
@@ -993,7 +995,7 @@ const speech = await client.voice.speak({
 await writeFile("welcome.mp3", await speech.bytes());
 ```
 
-Shape the delivery with [speech tags](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech#speech-tags) in the text. Inline tags such as `[pause]`, `[long-pause]`, and `[laugh]` go where the sound should happen, and wrapping tags such as `<whisper>It's a secret.</whisper>` change how the enclosed text is spoken. The API doesn't report mistakes in tags, so TypeScript checks string literals as you type: it flags unknown tags such as `[laff]` and suggests the closest one, and it catches wrapping tags that are never closed, closed without being opened, or closed in the wrong order. To use a tag released after this SDK version, add `as UnsafeSpeechText` to the text, which skips the check. Searching for `UnsafeSpeechText` then finds every tag to clean up once the SDK knows it:
+Shape the delivery with [speech tags](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech#speech-tags) in the text. Inline tags such as `[pause]`, `[long-pause]`, and `[laugh]` go where the sound should happen, and wrapping tags such as `<whisper>It's a secret.</whisper>` change how the enclosed text is spoken. The API doesn't report mistakes in tags, so TypeScript checks string literals as you type: it flags unknown tags such as `[laff]` and suggests the closest one, and it catches wrapping tags that are never closed, closed without being opened, or closed in the wrong order. Bracketed text counts as a tag when it's a known tag, has a hyphen, or resembles a known tag, so text such as `[they]` in a quote is read aloud and isn't flagged. To use a tag released after this SDK version, add `as UnsafeSpeechText` to the text, which skips the check. Searching for `UnsafeSpeechText` then finds every tag to clean up once the SDK knows it:
 
 ```ts
 import { type UnsafeSpeechText } from "@xai-official/sdk";
@@ -1004,7 +1006,7 @@ await client.voice.speak({
 });
 ```
 
-The type check only covers string literals, so text typed as `string` is sent unchecked. That matters for text you don't write yourself, such as a script the model wrote or text your users submit: the model can make up a tag such as `[laff]`, and the API reads it aloud. Put the real tags in the prompt with `INLINE_SPEECH_TAGS` and `WRAPPING_SPEECH_TAGS`, then call `stripInvalidSpeechTags()` before speaking, which removes any tag the API wouldn't recognize and keeps the words it wraps. `checkSpeechText()` returns the same problems the type check reports, for logging, for showing to a user, or for asking the model to fix its text:
+The type check only covers string literals, so text typed as `string` is sent unchecked. That matters for text you don't write yourself, such as a script the model wrote or text your users submit: the model can make up a tag such as `[laff]`, and the API reads it aloud. Put the real tags in the prompt with `INLINE_SPEECH_TAGS` and `WRAPPING_SPEECH_TAGS`, then call `stripInvalidSpeechTags()` before speaking, which removes any tag the API wouldn't recognize, and markup such as `<citation id="web:23"/>`, and keeps the words they wrap. `checkSpeechText()` returns the same problems the type check reports, for logging, for showing to a user, or for asking the model to fix its text:
 
 ```ts
 import { INLINE_SPEECH_TAGS, checkSpeechText, stripInvalidSpeechTags } from "@xai-official/sdk";
@@ -1040,6 +1042,8 @@ console.log(transcript.text);
 
 `format: true` writes spoken numbers, currencies, and units in written form, and requires `language`. Word-level timings are in `transcript.words`.
 
+With `diarize: true`, each word also has a `speaker`, and the API takes the audio format from the file name. A `File` sends its own name, and the SDK names a `Blob` with a MIME type after it, such as `audio.mp3` for `openAsBlob("./meeting.mp3", { type: "audio/mpeg" })`.
+
 Clone a voice from a reference clip of up to 120 seconds with `client.voice.custom.create()`. Creating custom voices through the API requires an Enterprise plan:
 
 ```ts
@@ -1064,7 +1068,7 @@ const secret = await client.voice.clientSecrets.create({
 });
 ```
 
-Send `secret.value` to the browser, which passes `xai-client-secret.<value>` as the WebSocket subprotocol when it connects to `wss://api.x.ai/v1/realtime`. Secrets expire after 10 minutes by default, and `expires_after.seconds` can be at most 3600.
+Send `secret.value` to the browser, which passes `xai-client-secret.<value>` as the WebSocket subprotocol when it connects to `wss://api.x.ai/v1/realtime`. Secrets expire after 10 minutes by default, and `expires_after.seconds` can be at most 3600. Pass `session` to set the session's `model`, `instructions`, `turn_detection`, and `reasoning` when the connection opens.
 
 ## Tokenization
 
@@ -1154,6 +1158,8 @@ console.log(apiKeyInfo.name, apiKeyInfo.acls, apiKeyInfo.api_key_disabled);
 ## Response storage
 
 The SDK sends `store: false` unless you opt in. This differs from the API wire default. With storage disabled, the SDK requests encrypted reasoning content so `response.toInput()` can preserve context between turns.
+
+Encrypted reasoning can be large: `grok-4.20-multi-agent` sends the state of all its agents in one stream event. Each stream event, like a JSON response, can be up to `maxResponseBodyBytes`, which defaults to 32 MiB.
 
 Pass `store: true` when you need to retrieve, continue, inspect, or delete a response by ID:
 

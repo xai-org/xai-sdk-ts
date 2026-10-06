@@ -160,6 +160,41 @@ describe("voice.transcribe", () => {
     expect(res.http.requestId).toBe("req_test");
   });
 
+  it("names an unnamed Blob after its MIME type, so the API can tell its format", async () => {
+    const bytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+    const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
+    const c = client(fetch);
+    const files = [
+      new Blob([bytes], { type: "audio/mpeg" }),
+      new Blob([bytes], { type: "audio/x-wav" }),
+      new Blob([bytes], { type: "audio/ogg; codecs=opus" }),
+      new Blob([bytes], { type: "video/x-matroska" }),
+      new File([bytes], "", { type: "audio/flac" }),
+      new File([bytes], "call.mp3", { type: "audio/wav" }),
+      new Blob([bytes]),
+      new Blob([bytes], { type: "audio/webm" }),
+    ];
+    for (const file of files) await c.voice.transcribe({ file, diarize: true });
+    await c.voice.transcribe({ file: new Blob([bytes], { type: "audio/mpeg" }), audio_format: "mp3" });
+
+    const sent: Array<[Array<string>, string]> = [];
+    for (const request of captured.requests) {
+      const entries = await formEntries(request);
+      sent.push([entries.map(([name]) => name), (entries.at(-1)![1] as File).name]);
+    }
+    expect(sent).toEqual([
+      [["diarize", "file"], "audio.mp3"],
+      [["diarize", "file"], "audio.wav"],
+      [["diarize", "file"], "audio.ogg"],
+      [["diarize", "file"], "audio.mkv"],
+      [["diarize", "file"], "audio.flac"],
+      [["diarize", "file"], "call.mp3"],
+      [["diarize", "file"], "blob"],
+      [["diarize", "file"], "blob"],
+      [["audio_format", "file"], "blob"],
+    ]);
+  });
+
   it("sends a url instead of a file and skips undefined options", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
     await client(fetch).voice.transcribe({
@@ -187,7 +222,7 @@ describe("voice.transcribe", () => {
 
 describe("voice.list and voice.get", () => {
   it("lists and gets built-in voices", async () => {
-    const eve = { voice_id: "eve", name: "Eve", language: "en" };
+    const eve = { voice_id: "eve", name: "Eve", language: "en", gender: "female" };
     const { fetch, captured } = mockFetch((req) =>
       req.url.endsWith("/tts/voices") ? jsonResponse({ voices: [eve] }) : jsonResponse(eve),
     );
@@ -202,6 +237,7 @@ describe("voice.list and voice.get", () => {
       "GET https://api.x.ai/v1/tts/voices/custom%2Fid",
     ]);
     expect(list.voices).toEqual([eve]);
+    expect(list.voices[0]?.gender).toBe("female");
     expect(list.http.requestId).toBe("req_test");
     expect(voice).toMatchObject(eve);
   });
@@ -246,6 +282,7 @@ describe("voice.custom", () => {
     const [name, file] = entries.at(-1)!;
     expect(name).toBe("file");
     expect((file as File).type).toBe("audio/wav");
+    expect((file as File).name).toBe("audio.wav");
     expect(new Uint8Array(await (file as File).arrayBuffer())).toEqual(wav);
 
     expect(voice).toMatchObject(customVoice);
@@ -334,7 +371,12 @@ describe("voice.clientSecrets", () => {
     const c = client(fetch);
     const params = {
       expires_after: { seconds: 300 },
-      session: { model: "grok-voice-latest", reasoning: { effort: "none" } },
+      session: {
+        model: "grok-voice-latest",
+        instructions: "You are a helpful assistant.",
+        reasoning: { effort: "none" },
+        turn_detection: { type: "server_vad", idle_timeout_ms: 10_000 },
+      },
     } satisfies ClientSecretCreateParams;
     const res = await c.voice.clientSecrets.create(params);
     await c.voice.clientSecrets.create();
