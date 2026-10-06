@@ -1,11 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
+  AbortError,
   APIError,
   APIProtocolError,
+  type DeferredImageResponse,
+  type HttpMeta,
   type ImageEditParams,
   type ImageGenerateParams,
+  type ImageResponse,
+  type ImageStartResponse,
   isImageGenerationCall,
+  NotFoundError,
   SpaceXAI,
+  TimeoutError,
 } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch } from "./helpers.js";
 
@@ -15,6 +22,18 @@ const imageResponse = {
   data: [{ url: "https://imgen.x.ai/xai-imgen/image-1.jpg", mime_type: "image/jpeg" }],
   usage: { cost_in_usd_ticks: 200_000_000 },
 };
+
+const requestId = "e5b1b4d4-7b6a-4a0e-9c0d-7f3c7d8a1b2c";
+
+const deferredDone = { request_id: requestId, status: "done", ...imageResponse };
+
+const deferredFailed = {
+  request_id: requestId,
+  status: "failed",
+  error: { code: "invalid_argument", message: "Prompt cannot be empty." },
+};
+
+const uploadUrl = "https://storage.example.com/images/cat.jpg?X-Signature=abc123";
 
 const jpegBytes = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10];
 const pngBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00];
@@ -43,6 +62,14 @@ function client(fetch: typeof globalThis.fetch): SpaceXAI {
 async function jsonBody(request: Request | undefined): Promise<Record<string, unknown>> {
   return (await request?.json()) as Record<string, unknown>;
 }
+
+function pendingResponse(): Response {
+  return new Response(null, { status: 202, headers: { "x-request-id": "req_test" } });
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("images.generate", () => {
   it("posts the params unchanged and maps data, usage, and http", async () => {
@@ -245,6 +272,297 @@ describe("image response validation", () => {
     await expect(
       client(fetch).images.generate({ model, prompt: "A lighthouse" }),
     ).rejects.toBeInstanceOf(APIProtocolError);
+  });
+});
+
+describe("deferred image requests", () => {
+  it("generate posts deferred: true and returns the request ID", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse({ request_id: requestId }));
+    const start = await client(fetch).images.generate({
+      model,
+      prompt: "A cat in a tree",
+      n: 2,
+      deferred: true,
+    });
+
+    expect(captured.requests[0]?.url).toBe("https://api.x.ai/v1/images/generations");
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: "A cat in a tree",
+      n: 2,
+      deferred: true,
+    });
+    expect(start.request_id).toBe(requestId);
+    expect(start.http.status).toBe(200);
+    expect(start.http.requestId).toBe("req_test");
+    expect(start).not.toHaveProperty("data");
+    expectTypeOf(start).toEqualTypeOf<ImageStartResponse & { http: HttpMeta }>();
+  });
+
+  it("edit inlines a Blob image, posts deferred: true, and returns the request ID", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse({ request_id: requestId }));
+    const start = await client(fetch).images.edit({
+      model,
+      prompt: "Add a hat",
+      image: new Blob(["png"], { type: "image/png" }),
+      deferred: true,
+    });
+
+    expect(captured.requests[0]?.url).toBe("https://api.x.ai/v1/images/edits");
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: "Add a hat",
+      image: { url: `data:image/png;base64,${btoa("png")}` },
+      deferred: true,
+    });
+    expect(start.request_id).toBe(requestId);
+    expectTypeOf(start).toEqualTypeOf<ImageStartResponse & { http: HttpMeta }>();
+  });
+
+  it("returns the images when deferred is false", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse(imageResponse));
+    const res = await client(fetch).images.generate({ model, prompt: "A lighthouse", deferred: false });
+
+    expect((await jsonBody(captured.requests[0])).deferred).toBe(false);
+    expect(res.data).toEqual(imageResponse.data);
+    expectTypeOf(res).toEqualTypeOf<ImageResponse>();
+  });
+
+  it("sends output upload URLs unchanged", async () => {
+    const { fetch, captured } = mockFetch(() =>
+      jsonResponse({ data: [{ url: uploadUrl, mime_type: "image/jpeg" }] }),
+    );
+    const res = await client(fetch).images.generate({
+      model,
+      prompt: "A cat in a tree",
+      response_format: "url",
+      output: { upload_urls: [uploadUrl] },
+    });
+
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: "A cat in a tree",
+      response_format: "url",
+      output: { upload_urls: [uploadUrl] },
+    });
+    expect(res.data[0]?.url).toBe(uploadUrl);
+  });
+
+  it.each([
+    ["a non-object body", "not json"],
+    ["a missing request_id", {}],
+    ["an empty request_id", { request_id: "" }],
+    ["finished images instead of a request ID", imageResponse],
+  ])("rejects a deferred start with %s", async (_label, payload) => {
+    const { fetch } = mockFetch(() => jsonResponse(payload));
+    await expect(
+      client(fetch).images.generate({ model, prompt: "A lighthouse", deferred: true }),
+    ).rejects.toBeInstanceOf(APIProtocolError);
+  });
+});
+
+describe("images.get", () => {
+  it("maps a done result with data, usage, and http", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse(deferredDone));
+    const c = client(fetch);
+    const res = await c.images.get(requestId);
+    await c.images.get("req/1");
+
+    expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `GET https://api.x.ai/v1/images/${requestId}`,
+      "GET https://api.x.ai/v1/images/req%2F1",
+    ]);
+    expect(res.request_id).toBe(requestId);
+    expect(res.status).toBe("done");
+    expect(res.data).toEqual(imageResponse.data);
+    expect(res.usage).toEqual({ cost_in_usd_ticks: 200_000_000, cost_usd: 0.02 });
+    expect(res.http.status).toBe(200);
+    expect(res.http.requestId).toBe("req_test");
+  });
+
+  it("returns a failed result with its error and null usage", async () => {
+    const { fetch } = mockFetch(() => jsonResponse(deferredFailed));
+    const res = await client(fetch).images.get(requestId);
+
+    expect(res).toMatchObject({ ...deferredFailed, usage: null });
+    expect(res.data).toBeUndefined();
+  });
+
+  it("reports a 202 response as pending, with or without a body", async () => {
+    const { fetch } = mockFetch((_req, n) =>
+      n === 1
+        ? pendingResponse()
+        : jsonResponse({ request_id: requestId, status: "pending" }, { status: 202 }),
+    );
+    const c = client(fetch);
+    const { http, ...empty } = await c.images.get(requestId);
+    const withBody = await c.images.get(requestId);
+
+    expect(empty).toEqual({ request_id: requestId, status: "pending", usage: null });
+    expect(http.status).toBe(202);
+    expect(withBody).toMatchObject({ request_id: requestId, status: "pending", usage: null });
+    expect(withBody.http.status).toBe(202);
+  });
+
+  it("fills in request_id when the body leaves it out", async () => {
+    const { fetch } = mockFetch(() => jsonResponse({ status: "done", data: imageResponse.data }));
+    expect((await client(fetch).images.get(requestId)).request_id).toBe(requestId);
+  });
+
+  it.each([
+    ["a non-object body", "not json"],
+    ["a null body", null],
+    ["an array body", [deferredDone]],
+    ["a missing status", { request_id: requestId, data: imageResponse.data }],
+  ])("rejects %s", async (_label, payload) => {
+    const { fetch } = mockFetch(() => jsonResponse(payload));
+    await expect(client(fetch).images.get(requestId)).rejects.toBeInstanceOf(APIProtocolError);
+  });
+});
+
+describe("images.wait", () => {
+  it("polls every second across 202 responses until the images are done", async () => {
+    vi.useFakeTimers();
+    const { fetch, captured } = mockFetch((_req, n) => {
+      if (n === 1) return pendingResponse();
+      if (n === 2) return jsonResponse({ request_id: requestId, status: "pending" }, { status: 202 });
+      return jsonResponse(deferredDone);
+    });
+    const pending = client(fetch).images.wait(requestId);
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(captured.requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(captured.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const res = await pending;
+
+    expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual(
+      Array(3).fill(`GET https://api.x.ai/v1/images/${requestId}`),
+    );
+    expect(res.status).toBe("done");
+    expect(res.data?.[0]?.url).toBe(imageResponse.data[0]?.url);
+    expect(res.usage?.cost_usd).toBe(0.02);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("returns a failed result without polling again", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse(deferredFailed));
+    const res = await client(fetch).images.wait(requestId);
+
+    expect(res).toMatchObject(deferredFailed);
+    expect(captured.requests).toHaveLength(1);
+  });
+
+  it("rejects with TimeoutError after 5 minutes by default and stops polling", async () => {
+    vi.useFakeTimers();
+    const { fetch, captured } = mockFetch(() => pendingResponse());
+    const pending = client(fetch).images.wait(requestId);
+    const rejection = expect(pending).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof TimeoutError &&
+        error.message === `Image request ${requestId} did not finish within 300000ms`,
+    );
+
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(captured.requests).toHaveLength(300);
+    await vi.advanceTimersByTimeAsync(1);
+    await rejection;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(captured.requests).toHaveLength(300);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("uses the given interval and rejects with AbortError when the signal aborts", async () => {
+    vi.useFakeTimers();
+    const ac = new AbortController();
+    const { fetch, captured } = mockFetch(() => pendingResponse());
+    const pending = client(fetch).images.wait(requestId, { interval: 250, signal: ac.signal });
+    const rejection = expect(pending).rejects.toBeInstanceOf(AbortError);
+
+    await vi.advanceTimersByTimeAsync(600);
+    expect(captured.requests).toHaveLength(3);
+    ac.abort();
+    await rejection;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(captured.requests).toHaveLength(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stops polling when the request is unknown or has expired", async () => {
+    const { fetch, captured } = mockFetch(() =>
+      jsonResponse({ error: "Unknown request id or the result has expired." }, { status: 404 }),
+    );
+    await expect(client(fetch).images.wait(requestId)).rejects.toBeInstanceOf(NotFoundError);
+    expect(captured.requests).toHaveLength(1);
+  });
+});
+
+describe("deferred image flow", () => {
+  it("starts a deferred generation, then polls until the images are ready", async () => {
+    vi.useFakeTimers();
+    const { fetch, captured } = mockFetch((req, n) => {
+      if (req.method === "POST") return jsonResponse({ request_id: requestId });
+      return n < 4 ? pendingResponse() : jsonResponse(deferredDone);
+    });
+    const c = client(fetch);
+
+    const start = await c.images.generate({ model, prompt: "A cat in a tree", deferred: true });
+    const pending = c.images.wait(start.request_id, { interval: 2_000 });
+    await vi.advanceTimersByTimeAsync(4_000);
+    const result = await pending;
+
+    expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      "POST https://api.x.ai/v1/images/generations",
+      `GET https://api.x.ai/v1/images/${requestId}`,
+      `GET https://api.x.ai/v1/images/${requestId}`,
+      `GET https://api.x.ai/v1/images/${requestId}`,
+    ]);
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: "A cat in a tree",
+      deferred: true,
+    });
+    expect(result).toMatchObject({
+      request_id: requestId,
+      status: "done",
+      data: imageResponse.data,
+      usage: { cost_in_usd_ticks: 200_000_000, cost_usd: 0.02 },
+    });
+    expectTypeOf(start).toEqualTypeOf<ImageStartResponse & { http: HttpMeta }>();
+    expectTypeOf(result).toEqualTypeOf<DeferredImageResponse>();
+  });
+
+  it("starts a deferred edit that uploads to signed URLs, then reads the upload URL", async () => {
+    const { fetch, captured } = mockFetch((req) =>
+      req.method === "POST"
+        ? jsonResponse({ request_id: requestId })
+        : jsonResponse({ ...deferredDone, data: [{ url: uploadUrl, mime_type: "image/jpeg" }] }),
+    );
+    const c = client(fetch);
+
+    const { request_id } = await c.images.edit({
+      model,
+      prompt: "Add a hat",
+      image: { file_id: "file_123" },
+      deferred: true,
+      output: { upload_urls: [uploadUrl] },
+    });
+    const result = await c.images.wait(request_id);
+
+    expect(captured.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      "POST https://api.x.ai/v1/images/edits",
+      `GET https://api.x.ai/v1/images/${requestId}`,
+    ]);
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: "Add a hat",
+      image: { file_id: "file_123" },
+      deferred: true,
+      output: { upload_urls: [uploadUrl] },
+    });
+    expect(result.status).toBe("done");
+    expect(result.data?.[0]?.url).toBe(uploadUrl);
   });
 });
 

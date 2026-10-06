@@ -133,6 +133,17 @@ type ImageRequestFields = {
   response_format?: "url" | "b64_json" | null;
   /** Defaults to `auto`. Only supported by `grok-imagine-image-2.0`. */
   quality?: "low" | "medium" | "auto" | null;
+  /**
+   * Return a `request_id` right away and generate in the background. Poll for the result with
+   * `images.wait()` or `images.get()`. Deferred requests support only `response_format: "url"`.
+   */
+  deferred?: boolean | null;
+  /**
+   * Upload each image with HTTP PUT to the matching signed URL in `upload_urls`, one per image, instead of
+   * storing it with SpaceXAI. Each image's `url` is then its upload URL. Requires `response_format: "url"`.
+   * Zero Data Retention teams must set this to use `deferred`.
+   */
+  output?: Schema["ImageOutput"] | null;
 };
 
 export type ImageGenerateParams = Omit<
@@ -159,6 +170,21 @@ export type GeneratedImage = Schema["GeneratedImage"];
 export type ImageResponse = Omit<Schema["GeneratedImageResponse"], "usage"> & {
   usage: MediaUsage | null;
   http: HttpMeta;
+};
+
+export type ImageStartResponse = Schema["StartDeferredResponse"];
+/** `status` is `pending`, `done`, or `failed`. A failed result has an `error` instead of `data`. */
+export type DeferredImageResponse = Omit<Schema["GetDeferredImageResponse"], "usage"> & {
+  usage: MediaUsage | null;
+  http: HttpMeta;
+};
+
+export type ImageWaitOptions = {
+  /** Milliseconds between polls. Defaults to 1000. */
+  interval?: number;
+  /** Maximum total wait in milliseconds. Defaults to 300000 (5 minutes). */
+  timeout?: number;
+  signal?: AbortSignal;
 };
 export type ImageGenerationModel = Schema["ImageGenerationModel"];
 export type ImageGenerationModelList = Schema["ListImageGenerationModelsResponse"];
