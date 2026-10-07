@@ -252,6 +252,54 @@ describe("responses.create stream", () => {
   });
 });
 
+describe("large stream events", () => {
+  const model = "grok-4.20-multi-agent";
+  const reasoning = {
+    type: "reasoning",
+    id: "rs_agents",
+    summary: [],
+    encrypted_content: "e".repeat(2 * 1024 * 1024),
+    status: "completed",
+  };
+  const response = { ...completedResponse, model, output: [reasoning, completedResponse.output[1]] };
+  const events = [
+    { type: "response.output_item.done", output_index: 0, item: reasoning },
+    { type: "response.completed", response },
+  ];
+
+  it("reads multi-agent encrypted reasoning larger than 1 MiB in one event", async () => {
+    const { fetch, captured } = mockFetch(() => sseResponse(events));
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const stream = await client.responses.create({ model, input: "Research this", stream: true });
+    const streamed = await stream.done();
+    const created = await client.responses.create({ model, input: "Research this" });
+
+    for (const result of [streamed, created]) {
+      expect(result.toInput()[0]).toEqual(reasoning);
+      expect(result.toText()).toBe("Hello world");
+    }
+    for (const request of captured.requests) {
+      expect(((await request.json()) as { include: Array<string> }).include).toEqual(["reasoning.encrypted_content"]);
+    }
+  });
+
+  it("limits each event to maxResponseBodyBytes", async () => {
+    const { fetch } = mockFetch(() => sseResponse(events));
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0, maxResponseBodyBytes: 1_048_576 });
+    await expect(client.responses.create({ model, input: "Research this" })).rejects.toThrow(
+      "SSE event exceeds 1048576 characters",
+    );
+    const stream = await client.responses.create({ model, input: "Research this", stream: true });
+    await expect(stream.done()).rejects.toThrow("SSE event exceeds 1048576 characters");
+
+    const raised = await client.responses.create(
+      { model, input: "Research this" },
+      { maxResponseBodyBytes: 4 * 1_048_576 },
+    );
+    expect(raised.output).toHaveLength(2);
+  });
+});
+
 describe("stream.on and stream.done", () => {
   const events = [
     { type: "response.created", response: { id: "resp_s", status: "in_progress", output: [] } },

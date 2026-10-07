@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AbortError,
   APIProtocolError,
   type ClientSecretCreateParams,
   type CustomVoiceUpdateParams,
@@ -44,6 +45,13 @@ function audioResponse(bytes: Uint8Array, contentType: string): Response {
 
 async function formEntries(request: Request | undefined): Promise<Array<[string, FormDataEntryValue]>> {
   return [...(await request!.formData()).entries()];
+}
+
+/** Builds a file's leading bytes from ASCII signatures and byte values. */
+function bytesOf(...parts: Array<string | Array<number>>): Uint8Array {
+  return new Uint8Array(
+    parts.flatMap((part) => (typeof part === "string" ? Array.from(part, (char) => char.charCodeAt(0)) : part)),
+  );
 }
 
 describe("voice.speak", () => {
@@ -160,6 +168,122 @@ describe("voice.transcribe", () => {
     expect(res.http.requestId).toBe("req_test");
   });
 
+  it("names an unnamed Blob after its MIME type, so the API can tell its format", async () => {
+    const bytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+    const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
+    const c = client(fetch);
+    const files = [
+      new Blob([bytes], { type: "audio/mpeg" }),
+      new Blob([bytes], { type: "audio/x-wav" }),
+      new Blob([bytes], { type: "audio/ogg; codecs=opus" }),
+      new Blob([bytes], { type: "video/x-matroska" }),
+      new File([bytes], "", { type: "audio/flac" }),
+      new File([bytes], "call.mp3", { type: "audio/wav" }),
+      new Blob([bytes], { type: "audio/webm" }),
+      new Blob([bytes], { type: "video/webm" }),
+      new Blob([bytes], { type: "audio/aiff" }),
+    ];
+    for (const file of files) await c.voice.transcribe({ file, diarize: true });
+    await c.voice.transcribe({ file: new Blob([bytes], { type: "audio/mpeg" }), audio_format: "mp3" });
+
+    const sent: Array<[Array<string>, string]> = [];
+    for (const request of captured.requests) {
+      const entries = await formEntries(request);
+      sent.push([entries.map(([name]) => name), (entries.at(-1)![1] as File).name]);
+    }
+    expect(sent).toEqual([
+      [["diarize", "file"], "audio.mp3"],
+      [["diarize", "file"], "audio.wav"],
+      [["diarize", "file"], "audio.ogg"],
+      [["diarize", "file"], "audio.mkv"],
+      [["diarize", "file"], "audio.flac"],
+      [["diarize", "file"], "call.mp3"],
+      [["diarize", "file"], "audio.webm"],
+      [["diarize", "file"], "audio.webm"],
+      [["diarize", "file"], "blob"],
+      [["audio_format", "file"], "blob"],
+    ]);
+  });
+
+  it("names an unnamed Blob without a MIME type after the format its first bytes show", async () => {
+    const wav = bytesOf("RIFF", [0x24, 0, 0, 0], "WAVEfmt ");
+    // An Ogg page header up to its segment count at byte 26, then the segment table and first packet.
+    const oggPage = bytesOf("OggS", [0, 2], Array.from({ length: 20 }, () => 0));
+    const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
+    const c = client(fetch);
+    const files = [
+      new Blob([bytesOf("ID3", [4, 0, 0, 0, 0, 0, 0])]),
+      new Blob([bytesOf([0xff, 0xfb, 0x90, 0x00])]),
+      new Blob([bytesOf([0xff, 0xf1, 0x50, 0x80, 0x02, 0x1f, 0xfc])]),
+      new Blob([wav, new Uint8Array(100)]),
+      new Blob([bytesOf("fLaC", [0, 0, 0, 0x22])]),
+      new Blob([oggPage, bytesOf([1, 30, 1], "vorbis")]),
+      new Blob([oggPage, bytesOf([1, 19], "OpusHead", [1, 2])]),
+      new Blob([bytesOf("OggS")]),
+      new Blob([bytesOf([0, 0, 0, 0x20], "ftypM4A ", [0, 0, 0, 0])]),
+      new Blob([bytesOf([0, 0, 0, 0x20], "ftypM4B ", [0, 0, 0, 0])]),
+      new Blob([bytesOf([0, 0, 0, 0x18], "ftypisom", [0, 0, 2, 0])]),
+      new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0xa3, 0x42, 0x86, 0x81, 1, 0x42, 0x82, 0x88], "matroska")]),
+      new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 1, 0x42, 0x82, 0x84], "webm")]),
+      new File([wav], "", { type: "application/octet-stream" }),
+      new Blob([bytesOf([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 1])]),
+      new Blob([bytesOf([0xff, 0xfd, 0x90, 0x00])]),
+      new Blob([bytesOf("Hello")]),
+      new Blob([bytesOf([0xff])]),
+      new Blob([]),
+      new File([wav], "call.bin"),
+      new Blob([wav], { type: "audio/webm" }),
+    ];
+    for (const file of files) await c.voice.transcribe({ file, diarize: true });
+    await c.voice.transcribe({ file: new Blob([wav]), audio_format: "wav" });
+
+    const sent: Array<File> = [];
+    for (const request of captured.requests) sent.push((await request.formData()).get("file") as File);
+    expect(sent.map((file) => file.name)).toEqual([
+      "audio.mp3",
+      "audio.mp3",
+      "audio.aac",
+      "audio.wav",
+      "audio.flac",
+      "audio.ogg",
+      "audio.opus",
+      "audio.ogg",
+      "audio.m4a",
+      "audio.m4a",
+      "audio.mp4",
+      "audio.mkv",
+      "audio.webm",
+      "audio.wav",
+      "blob",
+      "blob",
+      "blob",
+      "blob",
+      "blob",
+      "call.bin",
+      "audio.webm",
+      "blob",
+    ]);
+    expect(sent[3]?.size).toBe(wav.length + 100);
+  });
+
+  it("aborts while reading the first bytes of a Blob without a MIME type", async () => {
+    const ac = new AbortController();
+    class HangingBlob extends Blob {
+      override slice(): Blob {
+        return this;
+      }
+      override arrayBuffer(): Promise<ArrayBuffer> {
+        queueMicrotask(() => ac.abort());
+        return new Promise(() => {});
+      }
+    }
+    const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
+    await expect(
+      client(fetch).voice.transcribe({ file: new HangingBlob(["audio"]), diarize: true }, { signal: ac.signal }),
+    ).rejects.toBeInstanceOf(AbortError);
+    expect(captured.requests).toHaveLength(0);
+  });
+
   it("sends a url instead of a file and skips undefined options", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
     await client(fetch).voice.transcribe({
@@ -187,7 +311,7 @@ describe("voice.transcribe", () => {
 
 describe("voice.list and voice.get", () => {
   it("lists and gets built-in voices", async () => {
-    const eve = { voice_id: "eve", name: "Eve", language: "en" };
+    const eve = { voice_id: "eve", name: "Eve", language: "en", gender: "female" };
     const { fetch, captured } = mockFetch((req) =>
       req.url.endsWith("/tts/voices") ? jsonResponse({ voices: [eve] }) : jsonResponse(eve),
     );
@@ -202,6 +326,7 @@ describe("voice.list and voice.get", () => {
       "GET https://api.x.ai/v1/tts/voices/custom%2Fid",
     ]);
     expect(list.voices).toEqual([eve]);
+    expect(list.voices[0]?.gender).toBe("female");
     expect(list.http.requestId).toBe("req_test");
     expect(voice).toMatchObject(eve);
   });
@@ -246,10 +371,23 @@ describe("voice.custom", () => {
     const [name, file] = entries.at(-1)!;
     expect(name).toBe("file");
     expect((file as File).type).toBe("audio/wav");
+    expect((file as File).name).toBe("audio.wav");
     expect(new Uint8Array(await (file as File).arrayBuffer())).toEqual(wav);
 
     expect(voice).toMatchObject(customVoice);
     expect(voice.http.status).toBe(201);
+  });
+
+  it("names a clip without a MIME type after the format its first bytes show", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse(customVoice, { status: 201 }));
+    await client(fetch).voice.custom.create({
+      file: new Blob([bytesOf("RIFF", [0x24, 0, 0, 0], "WAVEfmt ")]),
+      name: "Friendly Narrator",
+    });
+
+    const [name, file] = (await formEntries(captured.requests[0])).at(-1)!;
+    expect(name).toBe("file");
+    expect((file as File).name).toBe("audio.wav");
   });
 
   it("lists voices and passes pagination query parameters", async () => {
@@ -334,7 +472,12 @@ describe("voice.clientSecrets", () => {
     const c = client(fetch);
     const params = {
       expires_after: { seconds: 300 },
-      session: { model: "grok-voice-latest", reasoning: { effort: "none" } },
+      session: {
+        model: "grok-voice-latest",
+        instructions: "You are a helpful assistant.",
+        reasoning: { effort: "none" },
+        turn_detection: { type: "server_vad", idle_timeout_ms: 10_000 },
+      },
     } satisfies ClientSecretCreateParams;
     const res = await c.voice.clientSecrets.create(params);
     await c.voice.clientSecrets.create();

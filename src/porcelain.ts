@@ -10,8 +10,12 @@ import type {
   OutputItem,
   OutputMessage,
   ReasoningItem,
+  TranscriptionParams,
   VideoInput,
 } from "./types.js";
+
+/** The formats the API reads from an audio file's name. `audio_format` takes all of them but `webm`. */
+export type AudioFileFormat = NonNullable<TranscriptionParams["audio_format"]> | "webm";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -111,6 +115,14 @@ function hasBytes(bytes: Uint8Array, offset: number, expected: ReadonlyArray<num
   return expected.every((byte, index) => bytes[offset + index] === byte);
 }
 
+function ascii(text: string): Array<number> {
+  return Array.from(text, (char) => char.charCodeAt(0));
+}
+
+function includesBytes(bytes: Uint8Array, expected: ReadonlyArray<number>): boolean {
+  return bytes.some((_, offset) => hasBytes(bytes, offset, expected));
+}
+
 /** The API rejects image data URLs that are not typed as JPEG, PNG, or WebP. */
 function sniffImageType(bytes: Uint8Array): string {
   if (hasBytes(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
@@ -118,6 +130,44 @@ function sniffImageType(bytes: Uint8Array): string {
   if (hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && hasBytes(bytes, 8, [0x57, 0x45, 0x42, 0x50])) {
     return "image/webp";
   }
+  return "application/octet-stream";
+}
+
+/** The audio containers the API detects, named by the file extensions it reads. Raw PCM has no header. */
+function sniffAudioFormat(bytes: Uint8Array): AudioFileFormat | undefined {
+  if (hasBytes(bytes, 0, ascii("ID3"))) return "mp3";
+  // After the sync bits, MPEG Layer III frames have layer bits 01, and AAC's ADTS headers have 00.
+  if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe6) === 0xe2) return "mp3";
+  if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xf6) === 0xf0) return "aac";
+  if (hasBytes(bytes, 0, ascii("RIFF")) && hasBytes(bytes, 8, ascii("WAVE"))) return "wav";
+  if (hasBytes(bytes, 0, ascii("fLaC"))) return "flac";
+  if (hasBytes(bytes, 0, ascii("OggS"))) {
+    // The first packet, which names the codec, follows the page's 27-byte header and segment table.
+    return hasBytes(bytes, 27 + (bytes[26] ?? 0), ascii("OpusHead")) ? "opus" : "ogg";
+  }
+  if (hasBytes(bytes, 4, ascii("ftyp"))) {
+    return hasBytes(bytes, 8, ascii("M4A ")) || hasBytes(bytes, 8, ascii("M4B ")) ? "m4a" : "mp4";
+  }
+  if (hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3])) {
+    // Matroska and WebM share the EBML header, whose DocType tells them apart.
+    if (includesBytes(bytes, ascii("matroska"))) return "mkv";
+    return includesBytes(bytes, ascii("webm")) ? "webm" : undefined;
+  }
+  return undefined;
+}
+
+/** Reads only the first bytes, since the Blob can be a long recording. */
+export async function readAudioFormat(blob: Blob, signal?: AbortSignal): Promise<AudioFileFormat | undefined> {
+  return sniffAudioFormat(new Uint8Array(await abortable(blob.slice(0, 64).arrayBuffer(), signal)));
+}
+
+/** Video generation takes images and reference audio, which is usually WAV or MP3. */
+function sniffMediaType(bytes: Uint8Array): string {
+  const image = sniffImageType(bytes);
+  if (image !== "application/octet-stream") return image;
+  const audio = sniffAudioFormat(bytes);
+  if (audio === "wav") return "audio/wav";
+  if (audio === "mp3") return "audio/mpeg";
   return "application/octet-stream";
 }
 
@@ -179,6 +229,44 @@ export async function inlineImageInput(
   signal?: AbortSignal,
 ): Promise<Exclude<ImageInput, Blob>> {
   return isBlobLike(image) ? { url: await blobToDataUrl(image, signal) } : image;
+}
+
+/** A request body whose `Blob` and `File` values are `{ url }` data URLs. */
+export type MediaUrls<T> = T extends Blob
+  ? { url: string }
+  : T extends string | number | boolean | null | undefined
+    ? T
+    : T extends ReadonlyArray<infer Item>
+      ? Array<MediaUrls<Item>>
+      : { [K in keyof T]: MediaUrls<T[K]> };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+async function inlineMediaValue(value: unknown, signal?: AbortSignal): Promise<unknown> {
+  assertNotAborted(signal);
+  if (isBlobLike(value)) return { url: await blobToDataUrl(value, signal, sniffMediaType) };
+  if (Array.isArray(value)) {
+    const out = [];
+    for (const item of value) out.push(await inlineMediaValue(item, signal));
+    return out;
+  }
+  // Other objects, such as a URL, keep their own JSON form.
+  if (!isPlainObject(value)) return value;
+  const next: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(value)) {
+    if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
+    next[k] = await inlineMediaValue(v, signal);
+  }
+  return next;
+}
+
+/** Converts every `Blob` or `File` in a request body, however deeply nested, to a `{ url }` data URL. */
+export async function inlineMediaUrls<T>(body: T, signal?: AbortSignal): Promise<MediaUrls<T>> {
+  return (await inlineMediaValue(body, signal)) as MediaUrls<T>;
 }
 
 /** The API accepts only MP4 source videos, so an untyped Blob is sent as `video/mp4`. */

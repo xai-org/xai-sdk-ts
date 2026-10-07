@@ -99,6 +99,7 @@ export type {
   OutputItem,
   OutputMessage,
   ReasoningItem,
+  ReferenceAudioInput,
   RequestHeaders,
   RequestHook,
   RequestOpts,

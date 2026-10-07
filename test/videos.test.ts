@@ -125,6 +125,53 @@ describe("videos.generate", () => {
     expect(params.keyframes[0]?.image).toBe(keyframe);
   });
 
+  it("inlines Blob and File values in last_frame and reference_audios", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse({ request_id: "req_1" }));
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const wav = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45]);
+    const id3 = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
+    const mpegFrame = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+    const base64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
+    const lastFrame = new Blob([png]);
+    const narrator = new File(["mp3-bytes"], "narrator.mp3", { type: "audio/mpeg" });
+    const params = {
+      model,
+      prompt: "The narrator walks to the window",
+      image: { url: "https://example.com/first.png" },
+      last_frame: lastFrame,
+      reference_audios: [
+        narrator,
+        new Blob([wav]),
+        new Blob([id3]),
+        new Blob([mpegFrame]),
+        new Blob(["?"]),
+        { voice_id: "ara" },
+        { url: "https://example.com/voice.wav" },
+      ],
+      output: { upload_url: "https://example.com/upload" },
+    } satisfies VideoGenerateParams;
+    await client(fetch).videos.generate(params);
+
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: params.prompt,
+      image: { url: "https://example.com/first.png" },
+      last_frame: { url: `data:image/png;base64,${base64(png)}` },
+      reference_audios: [
+        { url: `data:audio/mpeg;base64,${btoa("mp3-bytes")}` },
+        { url: `data:audio/wav;base64,${base64(wav)}` },
+        { url: `data:audio/mpeg;base64,${base64(id3)}` },
+        { url: `data:audio/mpeg;base64,${base64(mpegFrame)}` },
+        { url: `data:application/octet-stream;base64,${btoa("?")}` },
+        { voice_id: "ara" },
+        { url: "https://example.com/voice.wav" },
+      ],
+      output: { upload_url: "https://example.com/upload" },
+    });
+    expect(params.last_frame).toBe(lastFrame);
+    expect(params.reference_audios[0]).toBe(narrator);
+  });
+
   it("aborts while reading a Blob image", async () => {
     const ac = new AbortController();
     class HangingBlob extends Blob {

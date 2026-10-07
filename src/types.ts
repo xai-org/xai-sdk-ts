@@ -170,13 +170,27 @@ export type ImageGenerationModelList = Schema["ListImageGenerationModelsResponse
 
 type VideoKeyframe = Omit<Schema["VideoKeyframe"], "image"> & { image: ImageInput };
 
+/**
+ * A preset voice such as `ara`, or a clip of up to 15 seconds as a URL or data URL.
+ * Blob and File values are client-only: inlined to a `url` data URL before send.
+ */
+export type ReferenceAudioInput =
+  | { voice_id: VoiceId; url?: never }
+  | { url: string; voice_id?: never }
+  | Blob
+  | File;
+
 export type VideoGenerateParams = Omit<
   Schema["GenerateVideoRequest"],
-  "model" | "image" | "reference_images" | "keyframes"
+  "model" | "image" | "reference_images" | "reference_audios" | "keyframes"
 > & {
   model: VideoModelId;
   image?: ImageInput | null;
+  /** The frame the video ends on, as `image` is the one it starts on. */
+  last_frame?: ImageInput | null;
   reference_images?: Array<ImageInput>;
+  /** Voices for reference-to-video generation. Only some models accept them, up to 3. */
+  reference_audios?: Array<ReferenceAudioInput>;
   keyframes?: Array<VideoKeyframe>;
 };
 
@@ -403,6 +417,8 @@ export type Voice = {
   voice_id: string;
   name: string;
   language?: string | null;
+  /** `male`, `female`, or `neutral`, like custom voices. */
+  gender?: CustomVoiceGender | (string & {}) | null;
 };
 
 export type VoiceList = { voices: Array<Voice> };
@@ -463,7 +479,19 @@ export type ClientSecretCreateParams = {
   };
   session?: {
     model?: RealtimeModelId;
+    /** The system prompt. */
+    instructions?: string;
     reasoning?: { effort?: "high" | "none" };
+    /**
+     * With `type: "server_vad"`, the server detects when the user stops speaking. With `type: null`,
+     * the client commits each turn.
+     */
+    turn_detection?: {
+      type?: "server_vad" | (string & {}) | null;
+      /** Prompts the user again after this many milliseconds without speech once a response ends. */
+      idle_timeout_ms?: number | null;
+      [key: string]: unknown;
+    } | null;
   } | null;
 };
 
@@ -503,7 +531,7 @@ export type ClientOptions = {
   timeout?: number;
   /** Maximum time in milliseconds between response-body chunks. */
   idleTimeout?: number;
-  /** Maximum buffered JSON response size. Defaults to 32 MiB. */
+  /** Maximum size of a buffered JSON response, and of each event in a response stream. Defaults to 32 MiB. */
   maxResponseBodyBytes?: number;
   /** Number of retries. Creates retry only explicit 429 responses, unless `retryBeforeOutput` is set. */
   maxRetries?: number;
@@ -527,7 +555,7 @@ export type RequestOpts = {
   timeout?: number;
   /** Per-chunk idle timeout override in milliseconds. */
   idleTimeout?: number;
-  /** JSON response-size override in bytes. */
+  /** JSON response and stream event size override in bytes. */
   maxResponseBodyBytes?: number;
   /** Retry-count override. */
   maxRetries?: number;

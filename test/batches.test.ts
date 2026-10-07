@@ -162,6 +162,59 @@ describe("batches.wait", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("keeps polling while a batch created from a file has no requests yet", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-11-11T12:00:00Z"));
+    const { fetch, captured } = mockFetch((_req, n) => jsonResponse(n === 1 ? batch : withPending(n === 2 ? 2 : 0)));
+    const pending = client(fetch).batches.wait(batch.batch_id);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(captured.requests).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(5_000);
+    const res = await pending;
+
+    expect(captured.requests).toHaveLength(3);
+    expect(res.state).toEqual(withPending(0).state);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    ["cancelled", { cancel_time: "2025-11-11T12:00:04Z" }],
+    ["cancelled by SpaceXAI", { cancel_by_xai_message: "Batch cancelled by SpaceXAI" }],
+  ])("returns a batch without requests once it is %s", async (_label, cancellation) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-11-11T12:00:00Z"));
+    const { fetch, captured } = mockFetch((_req, n) => jsonResponse(n === 1 ? batch : { ...batch, ...cancellation }));
+    const pending = client(fetch).batches.wait(batch.batch_id);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(await pending).toMatchObject({ ...cancellation, state: batch.state });
+    expect(captured.requests).toHaveLength(2);
+  });
+
+  it("returns a batch without requests once it expires", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-11-11T23:59:58Z"));
+    const { fetch, captured } = mockFetch(() => jsonResponse(batch));
+    const pending = client(fetch).batches.wait(batch.batch_id);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(await pending).toMatchObject({ expire_time: "2025-11-12", state: batch.state });
+    expect(captured.requests).toHaveLength(2);
+  });
+
+  it("times out a batch that never gets requests and doesn't expire", async () => {
+    vi.useFakeTimers();
+    const { fetch, captured } = mockFetch(() => jsonResponse({ ...batch, expire_time: null }));
+    const pending = client(fetch).batches.wait(batch.batch_id, { timeout: 12_000 });
+    const rejection = expect(pending).rejects.toBeInstanceOf(TimeoutError);
+
+    await vi.advanceTimersByTimeAsync(12_000);
+    await rejection;
+    expect(captured.requests).toHaveLength(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("rejects with TimeoutError after 24 hours by default and stops polling", async () => {
     vi.useFakeTimers();
     const { fetch, captured } = mockFetch(() => jsonResponse(withPending(1)));

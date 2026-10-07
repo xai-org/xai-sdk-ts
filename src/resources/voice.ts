@@ -2,6 +2,7 @@ import { send, type SendResult } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { BinaryResponse } from "../binary.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
+import { readAudioFormat, type AudioFileFormat } from "../porcelain.js";
 import { requireRecord } from "./shared.js";
 import type {
   ClientSecret,
@@ -22,15 +23,61 @@ import type {
 import type { VoiceId } from "../generated/voice.js";
 import type { SpaceXAI } from "../client.js";
 
+const AUDIO_FORMATS = new Set<string>([
+  "pcm",
+  "mulaw",
+  "alaw",
+  "wav",
+  "mp3",
+  "ogg",
+  "opus",
+  "flac",
+  "aac",
+  "mp4",
+  "m4a",
+  "mkv",
+  "webm",
+] satisfies Array<AudioFileFormat>);
+/** MIME subtypes, without an `x-` prefix, whose format has another name. */
+const SUBTYPE_FORMATS = new Map([
+  ["mpeg", "mp3"],
+  ["wave", "wav"],
+  ["matroska", "mkv"],
+]);
+
+/**
+ * The API can read the audio format from the file name, which FormData sets to `blob` for a `Blob`
+ * without one. For such a Blob, returns a name such as `audio.mp3` from its MIME type, or from its
+ * first bytes if it has none, unless `audio_format` is set.
+ */
+async function audioFileName(file: Blob, audioFormat: unknown, signal?: AbortSignal): Promise<string | undefined> {
+  if (audioFormat !== undefined || (file instanceof File && file.name)) return undefined;
+  const essence = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (essence === "" || essence === "application/octet-stream") {
+    const sniffed = await readAudioFormat(file, signal);
+    return sniffed === undefined ? undefined : `audio.${sniffed}`;
+  }
+  const subtype = essence.split("/")[1]?.replace(/^x-/, "") ?? "";
+  const format = SUBTYPE_FORMATS.get(subtype) ?? subtype;
+  return AUDIO_FORMATS.has(format) ? `audio.${format}` : undefined;
+}
+
 /** Fields sent after `file` may be ignored, so `file` is appended last. */
-function toFormData({ file, ...fields }: { file?: Blob } & Record<string, unknown>): FormData {
+async function toFormData(
+  { file, ...fields }: { file?: Blob } & Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<FormData> {
   const form = new FormData();
   for (const [name, value] of Object.entries(fields)) {
     for (const item of Array.isArray(value) ? value : [value]) {
       if (item !== undefined) form.append(name, String(item));
     }
   }
-  if (file) form.append("file", file);
+  if (file) {
+    const filename = await audioFileName(file, fields.audio_format, signal);
+    if (filename === undefined) form.append("file", file);
+    else form.append("file", file, filename);
+  }
   return form;
 }
 
@@ -88,7 +135,7 @@ export class VoiceResource {
     const result = await send(this.client, {
       method: "POST",
       path: "/stt",
-      body: toFormData(body),
+      body: await toFormData(body, opts?.signal),
       opts,
     });
     const transcription = requireRecord(result.payload, result.http, "Transcription");
@@ -145,7 +192,7 @@ export class CustomVoices {
     const result = await send(this.client, {
       method: "POST",
       path: "/custom-voices",
-      body: toFormData(body),
+      body: await toFormData(body, opts?.signal),
       opts,
     });
     return toCustomVoice(result);

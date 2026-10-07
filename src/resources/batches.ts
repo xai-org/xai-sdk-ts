@@ -32,6 +32,12 @@ function toBatch(result: SendResult): Batch & { http: HttpMeta } {
   return { ...(body as Batch), http: result.http };
 }
 
+/** Cancelled, by you or by SpaceXAI, or past its expiry time. */
+function hasEnded(batch: Batch): boolean {
+  if (batch.cancel_time != null || batch.cancel_by_xai_message != null) return true;
+  return batch.expire_time != null && Date.parse(batch.expire_time) <= Date.now();
+}
+
 async function toWireRequest(request: BatchRequest, signal?: AbortSignal): Promise<unknown> {
   const { batch_request } = request;
   if (!("responses" in batch_request)) return request;
@@ -131,14 +137,17 @@ export class Batches {
   }
 
   /**
-   * Poll `get()` until no requests are pending. After `timeout`, rejects with
+   * Poll `get()` until the batch has requests and none are pending. After `timeout`, rejects with
    * `TimeoutError` while the batch keeps processing on the server.
+   *
+   * A batch created from `input_file_id` has no requests until it loads the file, so a batch without
+   * requests counts as finished only once it's cancelled or expires.
    */
   async wait(batchId: string, opts: BatchWaitOptions = {}): Promise<Batch & { http: HttpMeta }> {
     const { interval = DEFAULT_WAIT_INTERVAL_MS, timeout = DEFAULT_WAIT_TIMEOUT_MS, signal } = opts;
     return pollUntil(
       (pollSignal) => this.get(batchId, { signal: pollSignal }),
-      (batch) => batch.state.num_pending === 0,
+      (batch) => batch.state.num_pending === 0 && (batch.state.num_requests > 0 || hasEnded(batch)),
       { interval, timeout, signal, label: `Batch ${batchId}` },
     );
   }

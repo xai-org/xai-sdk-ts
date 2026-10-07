@@ -11,8 +11,9 @@ type WrappingTag = WrappingSpeechTags[number];
 type Letter =
   | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
   | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
+type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 
-/** Lowercase words joined by hyphens, like `long-pause`. Other bracketed text is read aloud. */
+/** Lowercase words joined by hyphens, like `long-pause`. */
 type IsTagName<S extends string> = S extends `${Letter}${infer Rest}` ? IsTagNameRest<Rest> : false;
 type IsTagNameRest<S extends string> = S extends ""
   ? true
@@ -58,6 +59,50 @@ type Better<
     ? true
     : false;
 
+/**
+ * Starts with a tag, or has at least four letters, shares the tag's first two, and is within two letters
+ * of its length. Shorter words such as `[sic]` are too often editorial to count.
+ */
+type ResemblesInlineTag<Name extends string, Tags extends Array<string> = InlineSpeechTags> = Tags extends [
+  infer Tag extends string,
+  ...infer Rest extends Array<string>,
+]
+  ? Name extends `${Tag}${string}`
+    ? true
+    : [Length<Name>, CommonPrefix<Name, Tag>, Distance<Length<Name>, Length<Tag>>] extends [
+          [0, 0, 0, 0, ...Array<0>],
+          [0, 0, ...Array<0>],
+          [] | [0] | [0, 0],
+        ]
+      ? true
+      : ResemblesInlineTag<Name, Rest>
+  : false;
+
+/**
+ * Bracketed text is a tag when it's a known tag, has a hyphen like `long-pause`, or resembles a known
+ * inline tag, like `[laff]` or `[laughs]`. Other bracketed text, such as `[they]` or `[Enter]`, is read aloud.
+ */
+type IsInlineTag<Name extends string> = IsTagName<Name> extends true
+  ? Name extends InlineTag | WrappingTag | `${string}-${string}`
+    ? true
+    : ResemblesInlineTag<Name>
+  : false;
+
+type MarkupNameChar = Letter | Uppercase<Letter> | Digit | "_" | "." | ":" | "-";
+type IsMarkupRest<S extends string> = S extends "" | "/"
+  ? true
+  : S extends `${" " | "\t" | "\n" | "\r"}${string}`
+    ? true
+    : S extends `${MarkupNameChar}${infer Rest}`
+      ? IsMarkupRest<Rest>
+      : false;
+/** XML-style markup between `<` and `>` that isn't a speech tag, like `cite id="1"/` or `/grok:render`. */
+type IsMarkup<Raw extends string> = Raw extends `${string}<${string}`
+  ? false
+  : (Raw extends `/${infer Tag}` ? Tag : Raw) extends `${Letter | Uppercase<Letter>}${infer Rest}`
+    ? IsMarkupRest<Rest>
+    : false;
+
 /** The highest-scoring tag for `Name`; ties keep docs order. */
 type Closest<
   Name extends string,
@@ -97,7 +142,7 @@ type InlineProblems<S extends string, Found extends Array<string> = [], Steps ex
     ? Found
     : S extends `${string}[${infer After}`
       ? After extends `${infer Name}]${infer Rest}`
-        ? IsTagName<Name> extends true
+        ? IsInlineTag<Name> extends true
           ? InlineProblems<
               Rest,
               Name extends InlineTag ? Found : [...Found, UnknownInline<Name>],
@@ -136,6 +181,18 @@ type CloseTag<Open extends Array<string>, Name extends string, Found extends Arr
           ],
         ];
 
+/** Markup is always removed, so it's reported on its own and doesn't count toward nesting. */
+type MarkupProblems<
+  After extends string,
+  Raw extends string,
+  Rest extends string,
+  Open extends Array<string>,
+  Found extends Array<string>,
+  Steps extends Array<0>,
+> = IsMarkup<Raw> extends true
+  ? WrappingProblems<Rest, Open, [...Found, `<${Raw}> is not a speech tag.`], [...Steps, 0]>
+  : WrappingProblems<After, Open, Found, [...Steps, 0]>;
+
 type WrappingProblems<
   S extends string,
   Open extends Array<string> = [],
@@ -153,7 +210,7 @@ type WrappingProblems<
             ]
             ? WrappingProblems<Rest, NextOpen, NextFound, [...Steps, 0]>
             : never
-          : WrappingProblems<After, Open, Found, [...Steps, 0]>
+          : MarkupProblems<After, Raw, Rest, Open, Found, Steps>
         : IsTagName<Raw> extends true
           ? WrappingProblems<
               Rest,
@@ -161,7 +218,7 @@ type WrappingProblems<
               Raw extends WrappingTag ? Found : [...Found, UnknownWrapping<`<${Raw}>`, Raw, "<">],
               [...Steps, 0]
             >
-          : WrappingProblems<After, Open, Found, [...Steps, 0]>
+          : MarkupProblems<After, Raw, Rest, Open, Found, Steps>
       : [...Found, ...NeverClosed<Open>]
     : [...Found, ...NeverClosed<Open>];
 
@@ -183,10 +240,10 @@ type Message<Problems extends Array<string>> = [
 export type UnsafeSpeechText = string;
 
 /**
- * Speech text that is a type error when a string literal has unknown tags or wrapping tags
- * that aren't closed in order. The API accepts such text without an error, then skips tags,
- * reads them aloud, or makes unrelated sounds. Text typed as `string` or `UnsafeSpeechText`
- * is sent as written, so tags released after this SDK still work.
+ * Speech text that is a type error when a string literal has unknown tags, wrapping tags that
+ * aren't closed in order, or markup such as `<cite id="1"/>`. The API accepts such text without
+ * an error, then skips tags, reads them aloud, or makes unrelated sounds. Text typed as `string`
+ * or `UnsafeSpeechText` is sent as written, so tags released after this SDK still work.
  */
 export type SpeechText<T extends string> = string extends T
   ? T
@@ -199,15 +256,29 @@ export type SpeechText<T extends string> = string extends T
 const INLINE = new Set<string>(INLINE_SPEECH_TAGS);
 const WRAPPING = new Set<string>(WRAPPING_SPEECH_TAGS);
 const TAG_NAME = /^[a-z]+(?:-[a-z]+)*$/;
+/** Like the `IsMarkup` type. */
+const MARKUP = /^<\/?[A-Za-z][\w.:-]*(?:[\t\n\r ][^<>]*|\/)?>$/;
 
-type Tag = { kind: "inline" | "open" | "close"; name: string; start: number; end: number };
+/** `name` is the whole tag for markup. */
+type Tag = { kind: "inline" | "open" | "close" | "markup"; name: string; start: number; end: number };
+
+/** Like the `IsInlineTag` type. */
+function isInlineTag(name: string): boolean {
+  if (!TAG_NAME.test(name)) return false;
+  if (INLINE.has(name) || WRAPPING.has(name) || name.includes("-")) return true;
+  return INLINE_SPEECH_TAGS.some(
+    (tag) =>
+      name.startsWith(tag) ||
+      (name.length >= 4 && name.slice(0, 2) === tag.slice(0, 2) && Math.abs(name.length - tag.length) <= 2),
+  );
+}
 
 /** Inline and wrapping tags are scanned separately, like the `SpeechText` check, so neither hides the other. */
 function inlineTags(text: string): Array<Tag> {
   const tags: Array<Tag> = [];
   for (const match of text.matchAll(/\[([^[\]]*)\]/g)) {
     const name = match[1] ?? "";
-    if (TAG_NAME.test(name)) {
+    if (isInlineTag(name)) {
       tags.push({ kind: "inline", name, start: match.index, end: match.index + match[0].length });
     }
   }
@@ -218,9 +289,12 @@ function wrappingTags(text: string): Array<Tag> {
   const tags: Array<Tag> = [];
   for (const match of text.matchAll(/<(\/?)([^<>]*)>/g)) {
     const name = match[2] ?? "";
+    const start = match.index;
+    const end = match.index + match[0].length;
     if (TAG_NAME.test(name)) {
-      const kind = match[1] ? "close" : "open";
-      tags.push({ kind, name, start: match.index, end: match.index + match[0].length });
+      tags.push({ kind: match[1] ? "close" : "open", name, start, end });
+    } else if (MARKUP.test(match[0])) {
+      tags.push({ kind: "markup", name: match[0], start, end });
     }
   }
   return tags;
@@ -262,9 +336,9 @@ function unknownWrapping(tag: string, name: string, opener: "<" | "</"): string 
 }
 
 /**
- * Lists the problems the `SpeechText` type reports for a string literal: unknown tags, and wrapping tags
- * that aren't closed in order. Use it for text you don't write yourself, such as model output. An empty
- * array means the API will read every tag as a tag.
+ * Lists the problems the `SpeechText` type reports for a string literal: unknown tags, wrapping tags
+ * that aren't closed in order, and markup such as `<cite id="1"/>`. Use it for text you don't write
+ * yourself, such as model output. An empty array means the API will read every tag as a tag.
  */
 export function checkSpeechText(text: string): Array<string> {
   const problems: Array<string> = [];
@@ -273,6 +347,10 @@ export function checkSpeechText(text: string): Array<string> {
   }
   const open: Array<string> = [];
   for (const { kind, name } of wrappingTags(text)) {
+    if (kind === "markup") {
+      problems.push(`${name} is not a speech tag.`);
+      continue;
+    }
     if (kind === "open") {
       open.push(name);
       if (!WRAPPING.has(name)) problems.push(unknownWrapping(`<${name}>`, name, "<"));
@@ -301,6 +379,8 @@ function stripOnce(text: string): string {
   for (const tag of tags) {
     if (tag.kind === "inline") {
       if (!INLINE.has(tag.name)) drop.add(tag);
+    } else if (tag.kind === "markup") {
+      drop.add(tag);
     } else if (tag.kind === "open") {
       open.push(tag);
     } else {
@@ -321,7 +401,8 @@ function stripOnce(text: string): string {
   let out = "";
   let last = 0;
   for (const tag of tags) {
-    if (!drop.has(tag)) continue;
+    // A bracketed tag can sit inside markup, such as in an attribute, and goes with it.
+    if (!drop.has(tag) || tag.start < last) continue;
     out += text.slice(last, tag.start);
     last = tag.end;
   }
@@ -329,8 +410,9 @@ function stripOnce(text: string): string {
 }
 
 /**
- * Removes the tags `checkSpeechText` reports, keeping the words they wrap, so the API doesn't read them
- * aloud. A misnested pair is removed whole; well-formed known tags are kept.
+ * Removes the tags and markup `checkSpeechText` reports, keeping the words they wrap, so the API doesn't
+ * read them aloud. A misnested pair is removed whole; well-formed known tags are kept, and so is bracketed
+ * text that doesn't look like a tag, such as `[they]` in a quote.
  */
 export function stripInvalidSpeechTags(text: string): string {
   let current = text;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SSE_EVENT_CHARS, parseSse } from "../src/sse.js";
+import { parseSse } from "../src/sse.js";
 
 function streamFrom(chunks: Array<string>): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -16,9 +16,18 @@ function streamFrom(chunks: Array<string>): ReadableStream<Uint8Array> {
   });
 }
 
-async function collect(body: ReadableStream<Uint8Array>): Promise<Array<unknown>> {
+function chunked(text: string, size: number): Array<string> {
+  const chunks: Array<string> = [];
+  for (let i = 0; i < text.length; i += size) chunks.push(text.slice(i, i + size));
+  return chunks;
+}
+
+async function collect(
+  body: ReadableStream<Uint8Array>,
+  opts?: Parameters<typeof parseSse>[1],
+): Promise<Array<unknown>> {
   const out: Array<unknown> = [];
-  for await (const item of parseSse(body)) out.push(item);
+  for await (const item of parseSse(body, opts)) out.push(item);
   return out;
 }
 
@@ -71,9 +80,44 @@ describe("parseSse", () => {
     expect(events).toEqual([{ type: "unknown", raw: "not-json" }]);
   });
 
-  it("rejects an unterminated oversized event", async () => {
-    await expect(
-      collect(streamFrom([`data: ${"x".repeat(MAX_SSE_EVENT_CHARS + 1)}`])),
-    ).rejects.toThrow(/SSE event exceeds/);
+  it("parses an event larger than 1 MiB that arrives in small chunks", async () => {
+    const event = {
+      type: "response.output_item.done",
+      item: { type: "reasoning", encrypted_content: "e".repeat(1_500_000) },
+    };
+    const events = await collect(streamFrom(chunked(`data: ${JSON.stringify(event)}\n\n`, 16_384)));
+    expect(events).toEqual([event]);
+  });
+
+  it("reads a long event without rescanning it for every chunk", async () => {
+    // Splitting the whole buffer per 4 KiB chunk takes longer than the test timeout here.
+    const event = { type: "ping", padding: "x".repeat(16 * 1024 * 1024) };
+    const events = await collect(streamFrom(chunked(`data: ${JSON.stringify(event)}\n\n`, 4096)));
+    expect(events).toEqual([event]);
+  });
+
+  it("finds a blank line split across chunks", async () => {
+    const events = await collect(
+      streamFrom(['data: {"type":"ping"}\r', "\n\r", '\ndata: {"type":"response.completed"}\n', "\n"]),
+    );
+    expect(events).toEqual([{ type: "ping" }, { type: "response.completed" }]);
+  });
+
+  it("rejects an event longer than maxEventChars, terminated or not", async () => {
+    const limit = { maxEventChars: 32 };
+    await expect(collect(streamFrom([`data: ${"x".repeat(32)}`]), limit)).rejects.toThrow(
+      "SSE event exceeds 32 characters",
+    );
+    await expect(collect(streamFrom(["data: ", "x".repeat(32)]), limit)).rejects.toThrow(
+      "SSE event exceeds 32 characters",
+    );
+    await expect(collect(streamFrom([`data: "${"x".repeat(32)}"\n\n`]), limit)).rejects.toThrow(
+      "SSE event exceeds 32 characters",
+    );
+  });
+
+  it("parses events of any length when maxEventChars is 0", async () => {
+    const event = { type: "ping", padding: "x".repeat(64) };
+    expect(await collect(streamFrom([`data: ${JSON.stringify(event)}\n\n`]), { maxEventChars: 0 })).toEqual([event]);
   });
 });

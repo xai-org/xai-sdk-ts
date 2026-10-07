@@ -48,6 +48,7 @@ try {
     assert(
       file === "package.json" ||
         file === "README.md" ||
+        file === "CHANGELOG.md" ||
         file === "LICENSE" ||
         file === "NOTICE" ||
         file.startsWith("dist/"),
@@ -55,6 +56,7 @@ try {
     );
     assert(!file.endsWith(".map"), `source map should not ship: ${file}`);
   }
+  assert(paths.includes("CHANGELOG.md"), "tarball is missing CHANGELOG.md, which README.md links to");
   assert(paths.includes("dist/index.js"), "tarball is missing dist/index.js");
   assert(paths.includes("dist/index.d.ts"), "tarball is missing dist/index.d.ts");
   assert(paths.includes("dist/tools.js"), "tarball is missing dist/tools.js");
@@ -134,7 +136,7 @@ try {
     const imageCalls: Array<ImageGenerationCall> = outputItems.filter(isImageGenerationCall);
     void client.voice.speak({ text: "Hi [pause] there.", language: "en" });
     // @ts-expect-error Unknown speech tags are type errors in string literals.
-    void client.voice.speak({ text: "Hi [luff] there.", language: "en" });
+    void client.voice.speak({ text: "Hi [laff] there.", language: "en" });
     void [model, futureModel, deleted, functionTool, webSearchTool, params, client, xSearchTool];
     void [imageModel, generate, edit, imageResponse, imageTool, imageCalls];
   `);

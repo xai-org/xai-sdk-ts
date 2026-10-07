@@ -109,6 +109,7 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
   #requestId: string | null;
   #signal: AbortSignal | undefined;
   #retry: StreamRetry | undefined;
+  #maxEventChars: number | undefined;
   #jsonText: string | undefined;
   #listeners = new Map<string, Array<(value: never) => void>>();
   #final: Record<string, unknown> | undefined;
@@ -123,12 +124,15 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
     /** The request asked for JSON output, so text deltas also feed the `"json"` helper event. */
     json?: boolean;
     retry?: StreamRetry;
+    /** Longest server-sent event in characters. The terminal event carries the whole response. */
+    maxEventChars?: number;
   }) {
     this.#http = init.http;
     this.#body = init.body;
     this.#requestId = init.http.requestId;
     this.#signal = init.signal;
     this.#retry = init.retry;
+    this.#maxEventChars = init.maxEventChars;
     this.#jsonText = init.json ? "" : undefined;
     // Keeps an iteration error from becoming an unhandled rejection when done() is never called.
     this.#ended.promise.catch(() => {});
@@ -314,7 +318,11 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
     const held: Array<ResponseStreamEvent> = [];
     let holding = canRetry;
     try {
-      for await (const raw of parseSse(body, { closeSignal: this.#closeController.signal })) {
+      const sse = parseSse(body, {
+        closeSignal: this.#closeController.signal,
+        maxEventChars: this.#maxEventChars,
+      });
+      for await (const raw of sse) {
         const event = this.#normalize(raw);
         if (holding) {
           if (isLifecycleEvent(event)) {

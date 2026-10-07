@@ -60,6 +60,7 @@ export class Responses {
         signal: opts?.signal,
         json: wantsJson(body),
         retry: budget && this.#streamRetry(payload, opts, result.http, budget),
+        maxEventChars: this.#maxEventChars(opts),
       });
     }
     return new ModelResponse(result.payload, result.http);
@@ -86,9 +87,15 @@ export class Responses {
       http: result.http,
       signal: opts?.signal,
       retry: budget && this.#streamRetry(payload, streamOpts, result.http, budget, true),
+      maxEventChars: this.#maxEventChars(opts),
     }).done();
     if (opts?.http?.body) response.http.body = response.raw;
     return response;
+  }
+
+  /** The terminal event holds the same response a JSON body would, so it gets the same size limit. */
+  #maxEventChars(opts: RequestOpts | undefined): number {
+    return opts?.maxResponseBodyBytes ?? this.client.maxResponseBodyBytes;
   }
 
   /** For `retryBeforeOutput`, one budget covers a call's first request, its HTTP retries, and every resend. */
