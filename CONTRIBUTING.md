@@ -29,7 +29,8 @@ Create a branch from `main` and make focused changes with tests and documentatio
 
 `src/generated/types.ts`, `src/generated/voice.ts`, `src/models.ts`, and `src/version.ts` are generated. Do not edit them directly.
 
-- Run `pnpm generate:types` to refresh OpenAPI types from the public SpaceXAI schema.
+- Run `pnpm generate:types` to refresh OpenAPI types from the public SpaceXAI schema. It saves the schema to `spec/openapi.json`, and `pnpm test` checks that the types match it.
+- When the schema gains a path, `pnpm generate:types` fails until you add the path to `KEEP_PATHS` in `scripts/openapi-paths.mjs` to generate its types, or to `IGNORED_PATHS` if the SDK won't wrap it.
 - Run `pnpm generate:models` to refresh known public model IDs.
 - Run `pnpm generate:voice` to refresh the speech tags, built-in voice IDs, and voice model IDs from the Voice docs.
 - The build verifies that `src/version.ts` matches `package.json`.

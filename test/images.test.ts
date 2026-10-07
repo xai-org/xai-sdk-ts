@@ -16,6 +16,8 @@ const imageResponse = {
   usage: { cost_in_usd_ticks: 200_000_000 },
 };
 
+const uploadUrl = "https://storage.example.com/images/cat.jpg?X-Signature=abc123";
+
 const jpegBytes = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10];
 const pngBytes = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00];
 const webpBytes = [
@@ -107,6 +109,23 @@ describe("images.generate", () => {
     const res = await client(fetch).images.generate({ model, prompt: "A lighthouse" });
     expect(res.usage).toEqual({ total_tokens: 10, cost_usd: null });
   });
+
+  it("sends output upload URLs and returns them as the image URLs", async () => {
+    const { fetch, captured } = mockFetch(() =>
+      jsonResponse({ data: [{ url: uploadUrl, mime_type: "image/jpeg" }], usage: imageResponse.usage }),
+    );
+    const params = {
+      model,
+      prompt: "A cat in a tree",
+      response_format: "url",
+      output: { upload_urls: [uploadUrl] },
+    } satisfies ImageGenerateParams;
+    const res = await client(fetch).images.generate(params);
+
+    expect(await jsonBody(captured.requests[0])).toEqual(params);
+    expect(res.data).toEqual([{ url: uploadUrl, mime_type: "image/jpeg" }]);
+    expect(res.usage?.cost_usd).toBe(0.02);
+  });
 });
 
 describe("images.edit", () => {
@@ -130,6 +149,26 @@ describe("images.edit", () => {
       prompt: "Add a hat",
       image: { file_id: "file_123" },
     });
+  });
+
+  it("sends output upload URLs alongside an inlined source image", async () => {
+    const { fetch, captured } = mockFetch(() =>
+      jsonResponse({ data: [{ url: uploadUrl, mime_type: "image/jpeg" }] }),
+    );
+    const res = await client(fetch).images.edit({
+      model,
+      prompt: "Add a hat",
+      image: new Blob(["png"], { type: "image/png" }),
+      output: { upload_urls: [uploadUrl] },
+    });
+
+    expect(await jsonBody(captured.requests[0])).toEqual({
+      model,
+      prompt: "Add a hat",
+      image: { url: `data:image/png;base64,${btoa("png")}` },
+      output: { upload_urls: [uploadUrl] },
+    });
+    expect(res.data[0]?.url).toBe(uploadUrl);
   });
 
   it("inlines a File source image to a data URL", async () => {

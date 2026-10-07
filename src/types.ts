@@ -133,17 +133,22 @@ type ImageRequestFields = {
   response_format?: "url" | "b64_json" | null;
   /** Defaults to `auto`. Only supported by `grok-imagine-image-2.0`. */
   quality?: "low" | "medium" | "auto" | null;
+  /**
+   * Upload each image with HTTP PUT to the matching signed URL in `upload_urls`, one per image, instead of
+   * storing it with SpaceXAI. Each image's `url` is then its upload URL. Requires `response_format: "url"`.
+   */
+  output?: Schema["ImageOutput"] | null;
 };
 
-export type ImageGenerateParams = Omit<
-  Schema["GenerateImageRequest"],
-  keyof ImageRequestFields
-> &
+/** The spec has `deferred`, but GET /v1/images/{request_id}, which returns deferred results, isn't live yet. */
+type OmittedImageFields = keyof ImageRequestFields | "deferred";
+
+export type ImageGenerateParams = Omit<Schema["GenerateImageRequest"], OmittedImageFields> &
   ImageRequestFields;
 
 export type ImageEditParams = Omit<
   Schema["EditImageRequest"],
-  keyof ImageRequestFields | "image" | "images"
+  OmittedImageFields | "image" | "images"
 > &
   ImageRequestFields &
   (

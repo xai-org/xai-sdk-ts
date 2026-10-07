@@ -6,6 +6,9 @@ All notable changes to the SpaceXAI TypeScript SDK will be documented in this fi
 
 ### Added
 
+- `output.upload_urls` on image requests uploads each image to a signed URL that you provide.
+- `service_tier: "fast"`, which is interchangeable with `"priority"` and uses a model's fast deployment where it has one.
+- `grok-imagine-video-1.5-lite` in `KnownVideoModelId`.
 - `last_frame` for `videos.generate()`, the image the video ends on. It takes the same inputs as `image`.
 - `reference_audios` for `videos.generate()` is typed: each entry is a preset voice as `{ voice_id }`, which autocompletes the built-in voices, a clip as `{ url }`, or a `Blob` or `File`, which the SDK converts to a data URL like `reference_images`. The `ReferenceAudioInput` type describes an entry.
 - `gender` on the voices that `voice.list()` and `voice.get()` return.
@@ -24,6 +27,7 @@ All notable changes to the SpaceXAI TypeScript SDK will be documented in this fi
 
 ### Changed
 
+- Updated the API types to the current OpenAPI spec. The `max_output_tokens` doc comment now says that it limits only visible output tokens, as the API does: reasoning and function call tokens don't count toward it.
 - `maxResponseBodyBytes` also limits each event in a response stream, which had a fixed limit of 1 MiB. Stream events can now be up to 32 MiB by default, and a client that sets a lower `maxResponseBodyBytes` applies it to stream events too.
 
 ## [0.2.2] - 2026-10-05

@@ -1,72 +1,48 @@
 #!/usr/bin/env node
 /**
- * Generates src/generated/types.ts from the official SpaceXAI HTTP OpenAPI spec.
- * Default: https://docs.x.ai/openapi.json
+ * Generates src/generated/types.ts from the official SpaceXAI HTTP OpenAPI spec and saves the spec, byte for
+ * byte, in spec/openapi.json. Default: https://api.x.ai/api-docs/openapi.json
+ *
+ * Fails when the spec has a path that scripts/openapi-paths.mjs neither keeps nor ignores.
+ * `--check` regenerates from spec/openapi.json and fails if src/generated/types.ts doesn't match.
  *
  * SSE event payload objects are not in that spec; those stay in src/types.ts.
  * This does not run on install or build.
  */
 
-import { spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { KEEP_PATHS, pathProblems } from "./openapi-paths.mjs";
 
 const ROOT = path.join(fileURLToPath(new URL("..", import.meta.url)));
 const CLI = path.join(ROOT, "node_modules/openapi-typescript/bin/cli.js");
 const OUT = path.join(ROOT, "src/generated/types.ts");
-const DEFAULT_URL = "https://docs.x.ai/openapi.json";
+const SNAPSHOT = path.join(ROOT, "spec/openapi.json");
+const DEFAULT_URL = "https://api.x.ai/api-docs/openapi.json";
 const UA = "Mozilla/5.0 (compatible; xai-sdk-ts/0.1)";
 
-const KEEP_PATHS = new Set([
-  "/v1/responses",
-  "/v1/responses/{response_id}",
-  "/v1/responses/{response_id}/input_items",
-  "/v1/models",
-  "/v1/models/{model_id}",
-  "/v1/images/generations",
-  "/v1/images/edits",
-  "/v1/image-generation-models",
-  "/v1/image-generation-models/{model_id}",
-  "/v1/files",
-  "/v1/files/{file_id}",
-  "/v1/files/{file_id}/content",
-  "/v1/files/{file_id}/public-url",
-  "/v1/files/{file_id}/public-url/revoke",
-  "/v1/responses/compact",
-  "/v1/videos/generations",
-  "/v1/videos/edits",
-  "/v1/videos/extensions",
-  "/v1/videos/{request_id}",
-  "/v1/video-generation-models",
-  "/v1/video-generation-models/{model_id}",
-  "/v1/tokenize-text",
-  "/v1/language-models",
-  "/v1/language-models/{model_id}",
-  "/v1/api-key",
-]);
-
-function specRef() {
-  return process.env.OPENAPI_SPEC_URL ?? DEFAULT_URL;
+function isUrl(ref) {
+  return /^https?:\/\//.test(ref);
 }
 
 async function loadSpec(ref) {
-  let text;
-  if (/^https?:\/\//.test(ref)) {
-    const response = await fetch(ref, {
-      headers: { accept: "application/json", "user-agent": UA },
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!response.ok) {
-      throw new Error(`GET ${ref} failed: ${response.status} ${response.statusText}`);
-    }
-    text = await response.text();
-  } else {
-    text = await readFile(path.resolve(ROOT, ref), "utf8");
+  if (!isUrl(ref)) return readFile(path.resolve(ROOT, ref), "utf8");
+  const response = await fetch(ref, {
+    headers: { accept: "application/json", "user-agent": UA },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    throw new Error(`GET ${ref} failed: ${response.status} ${response.statusText}`);
   }
+  return response.text();
+}
+
+function keepPaths(text) {
   if (!text.trimStart().startsWith("{")) {
     throw new Error("generate:types requires an OpenAPI JSON document");
   }
@@ -74,55 +50,76 @@ async function loadSpec(ref) {
   if (!spec.paths || typeof spec.paths !== "object") {
     throw new Error("OpenAPI document is missing paths");
   }
-  const paths = Object.fromEntries(
+  const problems = pathProblems(Object.keys(spec.paths));
+  if (problems.length > 0) {
+    throw new Error(`Update scripts/openapi-paths.mjs:\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
+  }
+  spec.paths = Object.fromEntries(
     Object.entries(spec.paths).filter(([candidate]) => KEEP_PATHS.has(candidate)),
   );
-  const missing = [...KEEP_PATHS].filter((candidate) => !(candidate in paths));
-  if (missing.length > 0) {
-    throw new Error(`OpenAPI document is missing required paths: ${missing.join(", ")}`);
+  return spec;
+}
+
+async function render(text, source) {
+  const spec = keepPaths(text);
+  const dir = await mkdtemp(path.join(os.tmpdir(), "xai-sdk-ts-"));
+  try {
+    const file = path.join(dir, "openapi.json");
+    await writeFile(file, JSON.stringify(spec));
+    // OpenAPI defaults describe server behavior; they do not make request
+    // properties required. Preserve the document's explicit `required` lists.
+    const generated = execFileSync(process.execPath, [CLI, file, "--default-non-nullable", "false"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    const { version } = JSON.parse(
+      await readFile(path.join(ROOT, "node_modules/openapi-typescript/package.json"), "utf8"),
+    );
+    const sourceHash = createHash("sha256").update(text).digest("hex");
+    const header = `/**\n * Generated by openapi-typescript ${version}.\n * Source: ${source}\n * Source SHA-256: ${sourceHash}\n * Do not edit by hand.\n */\n\n`;
+    return header + generated.replace(/^\/\*\*[\s\S]*?\*\/\s*/, "");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
-  spec.paths = paths;
-  const dir = path.join(os.tmpdir(), "xai-sdk-ts");
-  await mkdir(dir, { recursive: true });
-  const file = path.join(dir, "openapi.json");
-  await writeFile(file, JSON.stringify(spec));
-  return {
-    file,
-    sourceHash: createHash("sha256").update(text).digest("hex"),
-  };
+}
+
+async function readGenerated() {
+  return readFile(OUT, "utf8").catch(() => "");
+}
+
+/** The source URL recorded in src/generated/types.ts, kept when regenerating from the snapshot. */
+function recordedSource(generated) {
+  return /^ \* Source: (.+)$/m.exec(generated)?.[1] ?? DEFAULT_URL;
+}
+
+async function check() {
+  const generated = await readGenerated();
+  const expected = await render(await readFile(SNAPSHOT, "utf8"), recordedSource(generated));
+  if (generated !== expected) {
+    throw new Error(
+      "src/generated/types.ts doesn't match spec/openapi.json. Run pnpm generate:types to update both from the live spec, or OPENAPI_SPEC_URL=spec/openapi.json pnpm generate:types to regenerate from the snapshot.",
+    );
+  }
+}
+
+async function generate() {
+  const ref = process.env.OPENAPI_SPEC_URL ?? DEFAULT_URL;
+  console.error(`generate:types ${ref}`);
+  const text = await loadSpec(ref);
+  const fromSnapshot = !isUrl(ref) && path.resolve(ROOT, ref) === SNAPSHOT;
+  const output = await render(text, fromSnapshot ? recordedSource(await readGenerated()) : ref);
+  await mkdir(path.dirname(SNAPSHOT), { recursive: true });
+  await writeFile(SNAPSHOT, text);
+  await writeFile(OUT, output);
 }
 
 async function main() {
   if (!existsSync(CLI)) {
     throw new Error("generate:types: openapi-typescript is not installed (run pnpm install)");
   }
-  const ref = specRef();
-  console.error(`generate:types ${ref}`);
-  const { file, sourceHash } = await loadSpec(ref);
-  // OpenAPI defaults describe server behavior; they do not make request
-  // properties required. Preserve the document's explicit `required` lists.
-  const child = spawn(
-    process.execPath,
-    [CLI, file, "-o", OUT, "--default-non-nullable", "false"],
-    {
-      cwd: ROOT,
-      stdio: "inherit",
-    },
-  );
-  const code = await new Promise((resolve, reject) => {
-    child.on("error", reject);
-    child.on("exit", (status, signal) => {
-      if (signal) process.kill(process.pid, signal);
-      resolve(status ?? 1);
-    });
-  });
-  if (code !== 0) process.exit(code);
-  const generated = await readFile(OUT, "utf8");
-  const packageJson = JSON.parse(
-    await readFile(path.join(ROOT, "node_modules/openapi-typescript/package.json"), "utf8"),
-  );
-  const header = `/**\n * Generated by openapi-typescript ${packageJson.version}.\n * Source: ${ref}\n * Source SHA-256: ${sourceHash}\n * Do not edit by hand.\n */\n\n`;
-  await writeFile(OUT, header + generated.replace(/^\/\*\*[\s\S]*?\*\/\s*/, ""));
+  await (process.argv.includes("--check") ? check() : generate());
 }
 
 main().catch((err) => {
