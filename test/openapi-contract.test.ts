@@ -31,6 +31,11 @@ describe("OpenAPI image request contract", () => {
     expectTypeOf<ImageEditWireBody>().toExtend<EditImageBody>();
   });
 
+  it("output matches the documented request field", () => {
+    expectTypeOf<ImageGenerateParams["output"]>().toEqualTypeOf<GenerateImageBody["output"]>();
+    expectTypeOf<ImageEditWireBody["output"]>().toEqualTypeOf<EditImageBody["output"]>();
+  });
+
   it("images.edit sends an EditImageRequest body", async () => {
     const expected: EditImageBody = {
       model: "grok-imagine-image-2.0",

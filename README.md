@@ -781,6 +781,26 @@ const result = await client.images.generate(
 
 Each result provides `data`, `usage`, and `http`. `usage.cost_usd` converts the reported `cost_in_usd_ticks` to US dollars, and `usage` is `null` when the API omits it.
 
+To store images in your own bucket instead of with SpaceXAI, pass `output.upload_urls`: signed URLs that accept an HTTP `PUT`, one per image. Each image is uploaded to its URL, and its `url` in the result is that upload URL. Uploads need the default `response_format: "url"`:
+
+```ts
+const result = await client.images.generate({
+  model: "grok-imagine-image-2.0",
+  prompt: "A lighthouse at dawn",
+  n: 2,
+  output: {
+    upload_urls: [
+      "https://storage.example.com/lighthouse-1.jpg?signature=...",
+      "https://storage.example.com/lighthouse-2.jpg?signature=...",
+    ],
+  },
+});
+
+console.log(result.data.map((image) => image.url));
+```
+
+Each upload's `Content-Type` is the image's `mime_type`, which is `image/jpeg` unless the requested quality produces PNG, so sign the URLs for that type or without a `Content-Type` constraint.
+
 ## Image editing
 
 Pass a source image with your prompt to edit it. `image` accepts a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
@@ -814,6 +834,8 @@ const result = await client.images.edit({
   aspect_ratio: "16:9",
 });
 ```
+
+Edits also accept `output.upload_urls`, as described in [Image generation](#image-generation).
 
 ## Video generation
 
@@ -1169,6 +1191,22 @@ const inputItems = await client.responses.inputItems.list(stored.id);
 await client.responses.delete(stored.id);
 ```
 
+## Priority processing
+
+Set `service_tier` to `"priority"` or `"fast"` for faster responses at a higher price. The two values are interchangeable: on a model with a fast deployment, both use that deployment and its rates. Otherwise, both schedule the request ahead of standard traffic, which typically lowers latency when demand is high. `response.service_tier` reports the tier that served the request:
+
+```ts
+const response = await client.responses.create({
+  model: "grok-4.7",
+  input: "Explain the Riemann hypothesis in one paragraph.",
+  service_tier: "fast",
+});
+
+console.log(response.service_tier);
+```
+
+See [Priority Processing](https://docs.x.ai/developers/advanced-api-usage/priority-processing) for rates.
+
 ## Pagination
 
 List methods that return results in pages fetch the next page for you in a `for await` loop:
@@ -1288,7 +1326,7 @@ Create a distributable tarball and SHA-256 checksum in `artifacts/`:
 pnpm pack:artifact
 ```
 
-Generated API types live in `src/generated/types.ts`, speech tags, voice IDs, and voice model IDs in `src/generated/voice.ts`, and the model ID union in `src/models.ts`. Run `pnpm generate:types` for API types, `pnpm generate:voice` for the Voice API values, and `pnpm generate:models` for model IDs instead of editing those files by hand.
+Generated API types live in `src/generated/types.ts`, speech tags, voice IDs, and voice model IDs in `src/generated/voice.ts`, and the model ID union in `src/models.ts`. Run `pnpm generate:types` for API types, `pnpm generate:voice` for the Voice API values, and `pnpm generate:models` for model IDs instead of editing those files by hand. `pnpm generate:types` saves the OpenAPI spec it used to `spec/openapi.json`, and the tests fail if the generated types don't match it.
 
 ## Contributing and security
 

@@ -1,8 +1,8 @@
-import { combineSignals, send, sleep, type SendResult } from "../http.js";
-import { APIProtocolError, TimeoutError, requestIds } from "../errors.js";
+import { send, type SendResult } from "../http.js";
+import { APIProtocolError, requestIds } from "../errors.js";
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
-import { requireRecord } from "./shared.js";
+import { pollUntil, requireRecord } from "./shared.js";
 import type {
   Batch,
   BatchCreateParams,
@@ -135,21 +135,12 @@ export class Batches {
    * `TimeoutError` while the batch keeps processing on the server.
    */
   async wait(batchId: string, opts: BatchWaitOptions = {}): Promise<Batch & { http: HttpMeta }> {
-    const { interval = DEFAULT_WAIT_INTERVAL_MS, timeout = DEFAULT_WAIT_TIMEOUT_MS } = opts;
-    const deadline = new AbortController();
-    const timer = setTimeout(() => {
-      deadline.abort(new TimeoutError(`Batch ${batchId} did not finish within ${timeout}ms`));
-    }, timeout);
-    const signal = combineSignals([opts.signal, deadline.signal]);
-    try {
-      while (true) {
-        const batch = await this.get(batchId, { signal });
-        if (batch.state.num_pending === 0) return batch;
-        await sleep(interval, signal);
-      }
-    } finally {
-      clearTimeout(timer);
-    }
+    const { interval = DEFAULT_WAIT_INTERVAL_MS, timeout = DEFAULT_WAIT_TIMEOUT_MS, signal } = opts;
+    return pollUntil(
+      (pollSignal) => this.get(batchId, { signal: pollSignal }),
+      (batch) => batch.state.num_pending === 0,
+      { interval, timeout, signal, label: `Batch ${batchId}` },
+    );
   }
 }
 
