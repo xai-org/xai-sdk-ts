@@ -621,6 +621,36 @@ await stream
   .done();
 ```
 
+This example limits the search to an allowlist of handles and logs each server-side tool call after redacting its arguments, so search terms don't end up in your logs:
+
+```ts
+import { SpaceXAI } from "@xai-official/sdk";
+import { xSearch } from "@xai-official/sdk/tools";
+
+const client = new SpaceXAI();
+
+const stream = await client.responses.create({
+  model: "grok-4.7",
+  input: "What have @SpaceXAI and @SpaceX posted on X this week?",
+  tools: [xSearch({ allowed_x_handles: ["SpaceXAI", "SpaceX"] })],
+  stream: true,
+});
+
+const response = await stream
+  .on("server_tool_call", (call) => {
+    if (call.type === "custom_tool_call") {
+      const keys = Object.keys(JSON.parse(call.input ?? "{}"));
+      const redacted = Object.fromEntries(keys.map((key) => [key, "[redacted]"]));
+      console.log(call.name, redacted);
+    } else {
+      console.log(call.type);
+    }
+  })
+  .done();
+
+console.log(response.toText());
+```
+
 ### Code execution
 
 Let the model write and run Python for calculations and data analysis:
