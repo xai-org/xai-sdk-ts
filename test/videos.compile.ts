@@ -45,6 +45,8 @@ export const generateExamples = [
   { model: "grok-imagine-video-1.5", image: { file_id: "file_1" } },
   { model: "grok-imagine-video-released-after-this-sdk", prompt: "A lighthouse at dusk" },
   { model: "grok-imagine-video-1.5", image: { file_id: "file_1" }, last_frame: new Blob(["png"]) },
+  { model: "grok-imagine-video-1.5", prompt: "A lighthouse at dusk", aspect_ratio: "21:9" },
+  { model: "grok-imagine-video-1.5", prompt: "A lighthouse at dusk", aspect_ratio: "5:2" },
 ] satisfies Array<VideoGenerateParams>;
 
 export const referenceAudioExamples = [

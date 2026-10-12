@@ -85,6 +85,18 @@ describe("videos.generate", () => {
     expect(res.http.requestId).toBe("req_test");
   });
 
+  it("posts the 21:9 and 5:2 aspect ratios unchanged", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse({ request_id: "req_1" }));
+    const c = client(fetch);
+    const ultrawide = { model, prompt: "A desert road", aspect_ratio: "21:9" } satisfies VideoGenerateParams;
+    const panoramic = { model, prompt: "A desert road", aspect_ratio: "5:2" } satisfies VideoGenerateParams;
+    await c.videos.generate(ultrawide);
+    await c.videos.generate(panoramic);
+
+    expect(await jsonBody(captured.requests[0])).toEqual(ultrawide);
+    expect(await jsonBody(captured.requests[1])).toEqual(panoramic);
+  });
+
   it("inlines Blob and File images without mutating params", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse({ request_id: "req_1" }));
     const firstFrame = new File(["png-bytes"], "first.png", { type: "image/png" });

@@ -2,6 +2,12 @@
 
 All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `aspect_ratio` for `videos.generate()` accepts `"21:9"` and `"5:2"`.
+
 ## [0.2.3] - 2026-10-07
 
 ### Added
