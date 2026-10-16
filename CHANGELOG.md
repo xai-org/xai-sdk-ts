@@ -8,6 +8,11 @@ All notable changes to the SpaceXAI TypeScript SDK will be documented in this fi
 
 - `aspect_ratio` for `videos.generate()` accepts `"21:9"` and `"5:2"`.
 - `KnownRealtimeModelId` includes `"grok-voice-3.0"` and `"grok-voice-2.0"`. `"grok-voice-latest"` now points to `grok-voice-3.0`.
+- `guidelines` on `responses.create()`: per-category instructions for model output. Each entry is `{ type: "policy", category, behavior }`, where `category` is `"sexual"`, `"violence"`, `"self_harm"`, `"illicit"`, or `"profanity"` and `behavior` is `"decline"` (any category) or `"offer_support"` (`self_harm` only).
+
+### Changed
+
+- Regenerated types from the current API spec. The spec now describes `search_parameters`, `web_search_options`, and the `live_search` tool as deprecated: live search has been removed and these requests fail (`410 Gone` on Responses). Use the `web_search` and `x_search` tools instead. The tool limit in the `tools` description is now 1000.
 
 ## [0.2.3] - 2026-10-07
 
