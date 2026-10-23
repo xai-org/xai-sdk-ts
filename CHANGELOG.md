@@ -2,6 +2,14 @@
 
 All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
+## [0.2.5] - 2026-10-23
+
+### Changed
+
+- **Breaking:** `guidelines` on `responses.create()` takes the API's new categories. `category` is `"nsfw"`, `"violence"`, or `"profanity"`, and `behavior` is `"decline"`, the only behavior. `"sexual"` is renamed to `"nsfw"`, and the `"self_harm"` and `"illicit"` categories and the `"offer_support"` behavior are removed. The API rejects the old values with `422` and TypeScript reports them as errors, so replace `"sexual"` with `"nsfw"` and remove guidelines that use `"self_harm"`, `"illicit"`, or `"offer_support"`.
+- Updated the API types to the current OpenAPI spec. A request whose `guidelines` can't be applied, such as one to a multi-agent model or one that sets `stop`, fails with `400`. `temperature` above 1 is sampled at 1, and `top_p` above the model's default, 0.95 for Grok models, is sampled at that default. The documented `top_p` default is now 0.95, and a response's `temperature` and `top_p` are the values the request sent, or the model's defaults when it omitted them. Uploads to Azure Blob SAS URLs in image `output.upload_urls` and video `output.upload_url` also send `x-ms-blob-type: BlockBlob`, and video uploads send `Content-Type: video/mp4`.
+- The spec now allows up to 20 handles in `allowed_x_handles` and `excluded_x_handles` for the `x_search` tool, up from 10, and the `xSearch()` doc comment gives the limit.
+
 ## [0.2.4] - 2026-10-16
 
 ### Added

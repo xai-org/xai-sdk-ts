@@ -799,7 +799,7 @@ const result = await client.images.generate({
 console.log(result.data.map((image) => image.url));
 ```
 
-Each upload's `Content-Type` is the image's `mime_type`, which is `image/jpeg` unless the requested quality produces PNG, so sign the URLs for that type or without a `Content-Type` constraint.
+Each upload's `Content-Type` is the image's `mime_type`, which is `image/jpeg` unless the requested quality produces PNG, so sign the URLs for that type or without a `Content-Type` constraint. Uploads to Azure Blob SAS URLs also send `x-ms-blob-type: BlockBlob`.
 
 ## Image editing
 

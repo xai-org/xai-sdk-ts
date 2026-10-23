@@ -1,6 +1,6 @@
 {
   "name": "@xai-official/sdk",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "The official TypeScript SDK for the SpaceXAI API",
   "keywords": [
     "xai",
@@ -75,12 +75,12 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@types/node": "22.15.29",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "4.1.12",
     "openapi-typescript": "7.10.1",
     "oxlint": "1.80.0",
     "publint": "0.3.24",
     "typescript": "5.8.3",
-    "vitest": "4.1.11",
+    "vitest": "4.1.12",
     "zod": "4.6.5"
   }
 }
