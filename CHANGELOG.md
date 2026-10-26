@@ -2,6 +2,12 @@
 
 All notable changes to the SpaceXAI TypeScript SDK will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- With `retryBeforeOutput`, a streamed `responses.create()` whose connection drops after the `200` headers but before the first byte of the event stream is retried, like a connection that fails before the headers. It used to reject with `APIConnectionError` after one request, while a drop after the first byte was retried. An idle or per-attempt timeout, or a caller abort, before the first byte still fails the call, and the default without `retryBeforeOutput` is unchanged.
+
 ## [0.2.5] - 2026-10-23
 
 ### Changed
