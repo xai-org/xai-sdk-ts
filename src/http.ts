@@ -441,15 +441,9 @@ async function sendWithRetries(
             requestId: lastRequestId,
           });
         }
-        if (!response.body) {
+        if (binary && !response.body) {
           cleanupAttempt();
-          if (binary) return { response, http, payload: undefined, body: null, sawByte: false };
-          const noBody = new APIConnectionError("SSE response had no body", { requestId: lastRequestId });
-          if (canRetryBeforeFirstByte(req, budget, noBody)) {
-            await sleep(retryDelayMs(budget.spend(), null), req.opts?.signal);
-            continue;
-          }
-          throw noBody;
+          return { response, http, payload: undefined, body: null, sawByte: false };
         }
         const peeked = await peekFirstChunk(
           response,
