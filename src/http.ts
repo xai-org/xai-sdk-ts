@@ -141,8 +141,26 @@ export class RetryBudget {
   }
 }
 
+/**
+ * The longest delay `setTimeout` keeps. Node and browsers store it as a signed 32-bit integer and
+ * replace anything larger, `Infinity` included, with 1 ms, so an unguarded "no limit" fires at once.
+ */
+export const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * The delay to hand `setTimeout` for a deadline of `ms`, or `undefined` when there is none: `Infinity`
+ * and other non-finite values mean no deadline, and a finite value is capped at `MAX_TIMER_MS`.
+ * Callers decide what `0` and negative values mean.
+ */
+export function deadlineMs(ms: number): number | undefined {
+  if (!Number.isFinite(ms)) return undefined;
+  return Math.min(ms, MAX_TIMER_MS);
+}
+
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (ms <= 0) return Promise.resolve();
+  if (!(ms > 0)) return Promise.resolve();
+  // A pause longer than the timer range waits as long as a timer can, instead of 1 ms.
+  const delay = Math.min(ms, MAX_TIMER_MS);
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(errorFromAbort(signal, null));
@@ -155,7 +173,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
       resolve();
-    }, ms);
+    }, delay);
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
@@ -218,8 +236,10 @@ export function withQuery(url: string, query?: Record<string, string | number | 
 
 function timeoutSignal(ms: number | undefined): { signal?: AbortSignal; cleanup: () => void } {
   if (ms === undefined || ms <= 0) return { cleanup: () => {} };
+  const delay = deadlineMs(ms);
+  if (delay === undefined) return { cleanup: () => {} };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), ms);
+  const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), delay);
   return { signal: controller.signal, cleanup: () => clearTimeout(timer) };
 }
 
@@ -608,11 +628,12 @@ async function readOnce(
       finish(() => reject(errorFromAbort(signal!, requestId)));
     };
     signal?.addEventListener("abort", onAbort, { once: true });
-    if (idleTimeout > 0) {
+    const idleDelay = idleTimeout > 0 ? deadlineMs(idleTimeout) : undefined;
+    if (idleDelay !== undefined) {
       idle = setTimeout(() => {
         void reader.cancel().catch(() => {});
         finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
-      }, idleTimeout);
+      }, idleDelay);
     }
     reader.read().then(
       (value) => finish(() => resolve(value)),

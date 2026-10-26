@@ -1258,6 +1258,8 @@ controller.abort();
 await pending;
 ```
 
+`timeout` bounds one attempt from the request to the end of its body, and `idleTimeout` bounds the gap between two chunks of a body. Both are milliseconds; `0` or `Infinity` means no limit.
+
 Requests that generate content, such as `responses.create`, `images.generate`, and `images.edit`, retry only explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and otherwise use jittered exponential backoff, which starts at 1 second for a `429`.
 
 Set `retryBeforeOutput: true`, on the client or on one request, to also retry streamed `responses.create()` calls, including ones without `stream`, when they fail before the model produces any output: a `5xx` status, a dropped connection, or a stream error such as a `503` right after `response.created`. All retries of a call share `maxRetries`, so a call makes at most `maxRetries + 1` requests. Events from the failed attempt don't reach your listeners or loop, and every attempt sends the same `x-client-request-id`. Each retry starts a new response, and the API may still bill the failed attempt's input tokens, so this is off by default. Errors after output has started are never retried, and neither are `5xx` responses to `stream: false` requests, which can arrive after the model has finished.
