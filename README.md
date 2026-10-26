@@ -861,7 +861,7 @@ if (result.status === "done") {
 
 `wait()` resolves once the status is no longer `pending`: `done`, `failed`, or `expired`. A failed result includes an `error` with a `code` and `message`. If `video.respect_moderation` is `false`, the video did not pass moderation and has no URL. Video URLs are temporary, so download the file promptly.
 
-`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the job: the video keeps generating and is billed when it finishes. The API has no way to cancel a video yet. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
+`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A `timeout` of `Infinity` waits with no limit. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the job: the video keeps generating and is billed when it finishes. The API has no way to cancel a video yet. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
 
 To animate a still image, pass it as `image`, and pass `last_frame` to choose the frame the video ends on. `image`, `last_frame`, `reference_images`, and keyframe images accept a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
 
@@ -999,7 +999,7 @@ for await (const { batch_request_id, batch_result } of client.batches.results(ba
 }
 ```
 
-`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. A batch created from `input_file_id` has no requests until it has loaded the file, so `wait()` keeps polling a batch without requests until requests arrive, or until the batch is cancelled or expires. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
+`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. A `timeout` of `Infinity` waits with no limit. A batch created from `input_file_id` has no requests until it has loaded the file, so `wait()` keeps polling a batch without requests until requests arrive, or until the batch is cancelled or expires. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
 
 ## Voice
 

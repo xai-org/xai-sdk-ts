@@ -7,7 +7,7 @@ All notable changes to the SpaceXAI TypeScript SDK will be documented in this fi
 ### Fixed
 
 - With `retryBeforeOutput`, a streamed `responses.create()` whose connection drops after the `200` headers but before the first byte of the event stream is retried, like a connection that fails before the headers. It used to reject with `APIConnectionError` after one request, while a drop after the first byte was retried. An idle or per-attempt timeout, or a caller abort, before the first byte still fails the call, and the default without `retryBeforeOutput` is unchanged.
-- `timeout`, `idleTimeout`, and the `timeout` of `videos.wait()` and `batches.wait()` accept `Infinity` as "no limit", and a value past the timer range (about 24.8 days) waits as long as a timer can. Node and browsers keep a timer delay in a signed 32-bit integer and replace a larger one with 1 ms, so these values used to time out at once; an `interval` of `Infinity` used to poll every millisecond.
+- `timeout`, `idleTimeout`, and the `timeout` of `videos.wait()` and `batches.wait()` accept `Infinity` as "no limit", and a value past the timer range (about 24.8 days) waits as long as a timer can. Node and browsers keep a timer delay in a signed 32-bit integer, and a larger one overflows, so these values used to time out at once; an `interval` of `Infinity` used to poll every millisecond. `NaN` now counts as `0` for all of these options, so a `timeout` of `NaN` means no limit instead of timing out at once.
 
 ## [0.2.5] - 2026-10-23
 

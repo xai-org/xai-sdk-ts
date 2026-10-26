@@ -142,24 +142,23 @@ export class RetryBudget {
 }
 
 /**
- * The longest delay `setTimeout` keeps. Node and browsers store it as a signed 32-bit integer and
- * replace anything larger, `Infinity` included, with 1 ms, so an unguarded "no limit" fires at once.
+ * The longest delay `setTimeout` keeps. Node and browsers store it as a signed 32-bit integer, and a
+ * larger one, `Infinity` included, overflows and fires at once.
  */
 export const MAX_TIMER_MS = 2_147_483_647;
 
 /**
- * The delay to hand `setTimeout` for a deadline of `ms`, or `undefined` when there is none: `Infinity`
- * and other non-finite values mean no deadline, and a finite value is capped at `MAX_TIMER_MS`.
- * Callers decide what `0` and negative values mean.
+ * The delay to hand `setTimeout` for a deadline of `ms`, or `undefined` for `Infinity`, which never expires.
+ * A delay past the timer range is capped at `MAX_TIMER_MS`, and one that isn't positive, `NaN` included, is 0.
  */
 export function deadlineMs(ms: number): number | undefined {
-  if (!Number.isFinite(ms)) return undefined;
-  return Math.min(ms, MAX_TIMER_MS);
+  if (ms === Number.POSITIVE_INFINITY) return undefined;
+  return ms > 0 ? Math.min(ms, MAX_TIMER_MS) : 0;
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (!(ms > 0)) return Promise.resolve();
-  // A pause longer than the timer range waits as long as a timer can, instead of 1 ms.
+  // A pause longer than the timer range waits as long as a timer can, instead of ending at once.
   const delay = Math.min(ms, MAX_TIMER_MS);
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -235,8 +234,7 @@ export function withQuery(url: string, query?: Record<string, string | number | 
 }
 
 function timeoutSignal(ms: number | undefined): { signal?: AbortSignal; cleanup: () => void } {
-  if (ms === undefined || ms <= 0) return { cleanup: () => {} };
-  const delay = deadlineMs(ms);
+  const delay = ms !== undefined && ms > 0 ? deadlineMs(ms) : undefined;
   if (delay === undefined) return { cleanup: () => {} };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), delay);
