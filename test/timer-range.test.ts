@@ -1,16 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MAX_TIMEOUT_MS } from "../src/constants.js";
 import { SpaceXAI, TimeoutError } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
-// Node and browsers keep timer delays in a signed 32-bit integer. A larger delay, such as
-// `Infinity` passed to mean "no limit", overflows, so the deadline fires at once.
+// Node and browsers keep a timer delay in a signed 32-bit integer, so 2^31 ms, about 24.8 days, overflows and
+// fires at once unless the SDK caps it.
 const OVER_RANGE_MS = 2_147_483_648;
 
-const completedResponse = {
-  id: "resp_1",
-  status: "completed",
-  output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] }],
-};
+// Every option caps these at 24 hours.
+const OVER_CAP: Array<[string, number]> = [
+  ["Infinity", Number.POSITIVE_INFINITY],
+  ["2^31", OVER_RANGE_MS],
+  ["one past the cap", MAX_TIMEOUT_MS + 1],
+];
+
+// These count as 0, which is the cap for a request or idle timeout, and no wait for a wait() timeout or interval.
+const NOT_POSITIVE: Array<[string, number]> = [
+  ["0", 0],
+  ["NaN", Number.NaN],
+  ["-Infinity", Number.NEGATIVE_INFINITY],
+];
 
 const doneVideo = {
   status: "done",
@@ -21,83 +30,93 @@ function pendingVideo(): Response {
   return new Response(null, { status: 202, headers: { "x-request-id": "req_test" } });
 }
 
-function slowJson(body: unknown, ms: number): Promise<Response> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(jsonResponse(body)), ms);
-  });
-}
-
-function slowCreate(timeout: number) {
-  const { fetch } = mockFetch(() => slowJson(completedResponse, 30));
-  return new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, timeout }).responses.create({
-    model: "grok-4.7",
-    input: "hi",
-    stream: false,
-  });
+function waitForVideo(fetch: typeof globalThis.fetch, opts: { interval?: number; timeout?: number }) {
+  return new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).videos.wait("req_1", opts);
 }
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("timer delays outside the 32-bit range", () => {
-  it.each([
-    ["Infinity", Number.POSITIVE_INFINITY],
-    ["2^31", OVER_RANGE_MS],
-  ])("a request timeout of %s does not time out at once", async (_label, timeout) => {
-    const res = await slowCreate(timeout);
-    expect(res.id).toBe("resp_1");
-  });
+describe("request timeout", () => {
+  it.each([...OVER_CAP, ...NOT_POSITIVE])("%s times out after 24 hours", async (_label, timeout) => {
+    vi.useFakeTimers();
+    const { fetch, captured } = mockFetch(() => new Promise<Response>(() => {}));
+    const pending = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, timeout }).responses.create({
+      model: "grok-4.7",
+      input: "hi",
+      stream: false,
+    });
+    const rejection = expect(pending).rejects.toSatisfy(
+      (error: unknown) => error instanceof TimeoutError && error.message === "Request timed out",
+    );
 
-  it.each([
-    ["Infinity", Number.POSITIVE_INFINITY],
-    ["2^31", OVER_RANGE_MS],
-  ])("an idle timeout of %s does not cut a slow body", async (_label, idleTimeout) => {
-    let cancelled = false;
+    await vi.advanceTimersByTimeAsync(MAX_TIMEOUT_MS - 1);
+    expect(captured.requests[0]?.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(captured.requests[0]?.signal.aborted).toBe(true);
+    await rejection;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("idleTimeout", () => {
+  it.each([...OVER_CAP, ...NOT_POSITIVE])("%s waits up to 24 hours for the next chunk", async (_label, idleTimeout) => {
+    vi.useFakeTimers();
+    let deliver!: () => void;
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        setTimeout(() => {
-          // An idle timer that overflowed has already cancelled the stream by now.
-          if (cancelled) return;
+        deliver = () => {
           controller.enqueue(new TextEncoder().encode("abc"));
           controller.close();
-        }, 30);
-      },
-      cancel() {
-        cancelled = true;
+        };
       },
     });
     const { fetch } = mockFetch(
       () => new Response(body, { status: 200, headers: { "content-type": "application/octet-stream" } }),
     );
-    const file = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout }).files.content("file_1");
-    expect(await file.text()).toBe("abc");
-  });
+    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, timeout: MAX_TIMEOUT_MS, idleTimeout });
+    const pending = client.files.content("file_1");
 
-  it.each([
-    ["Infinity", Number.POSITIVE_INFINITY],
-    ["2^31", OVER_RANGE_MS],
-  ])("wait() with timeout %s keeps polling until the job is done", async (_label, timeout) => {
+    await vi.advanceTimersByTimeAsync(MAX_TIMEOUT_MS - 1);
+    // The request timeout and the idle timeout are both armed. The request timeout started first and has the
+    // same 24-hour cap, so an idle timer at the cap never fires before it.
+    expect(vi.getTimerCount()).toBe(2);
+    deliver();
+    const file = await pending;
+    expect(await file.text()).toBe("abc");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("wait() timeout", () => {
+  it.each(OVER_CAP)("%s times out after 24 hours", async (_label, timeout) => {
     vi.useFakeTimers();
-    const { fetch, captured } = mockFetch((_req, n) => (n < 3 ? pendingVideo() : jsonResponse(doneVideo)));
-    const pending = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).videos.wait("req_1", { timeout });
-    await vi.advanceTimersByTimeAsync(10_000);
-    const res = await pending;
-    expect(res.status).toBe("done");
-    expect(captured.requests).toHaveLength(3);
+    const { fetch, captured } = mockFetch(() => pendingVideo());
+    const pending = waitForVideo(fetch, { interval: 3_600_000, timeout });
+    const rejection = expect(pending).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof TimeoutError &&
+        error.message === `Video request req_1 did not finish within ${MAX_TIMEOUT_MS}ms`,
+    );
+
+    await vi.advanceTimersByTimeAsync(MAX_TIMEOUT_MS - 1);
+    expect(captured.requests).toHaveLength(24);
+    await vi.advanceTimersByTimeAsync(1);
+    await rejection;
+    expect(captured.requests).toHaveLength(24);
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("wait() with interval Infinity polls once and then waits for the timeout", async () => {
+  it.each(NOT_POSITIVE)("%s expires at once", async (_label, timeout) => {
     vi.useFakeTimers();
     const { fetch, captured } = mockFetch(() => pendingVideo());
-    const pending = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).videos.wait("req_1", {
-      interval: Number.POSITIVE_INFINITY,
-      timeout: 30_000,
-    });
-    const rejection = expect(pending).rejects.toBeInstanceOf(TimeoutError);
-    await vi.advanceTimersByTimeAsync(29_999);
-    expect(captured.requests).toHaveLength(1);
+    const pending = waitForVideo(fetch, { timeout });
+    const rejection = expect(pending).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof TimeoutError && error.message === "Video request req_1 did not finish within 0ms",
+    );
+
     await vi.advanceTimersByTimeAsync(1);
     await rejection;
     expect(captured.requests).toHaveLength(1);
@@ -105,28 +124,30 @@ describe("timer delays outside the 32-bit range", () => {
   });
 });
 
-describe("timer values that aren't positive", () => {
-  it.each([
-    ["0", 0],
-    ["NaN", Number.NaN],
-    ["-Infinity", Number.NEGATIVE_INFINITY],
-  ])("a request timeout of %s means no limit", async (_label, timeout) => {
-    const res = await slowCreate(timeout);
-    expect(res.id).toBe("resp_1");
-  });
-
-  it.each([
-    ["0", 0],
-    ["NaN", Number.NaN],
-    ["-Infinity", Number.NEGATIVE_INFINITY],
-  ])("a wait() timeout of %s expires at once", async (_label, timeout) => {
+describe("wait() interval", () => {
+  it.each(OVER_CAP)("%s polls once and then waits for a 24-hour timeout", async (_label, interval) => {
     vi.useFakeTimers();
     const { fetch, captured } = mockFetch(() => pendingVideo());
-    const pending = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).videos.wait("req_1", { timeout });
+    const pending = waitForVideo(fetch, { interval, timeout: MAX_TIMEOUT_MS });
     const rejection = expect(pending).rejects.toBeInstanceOf(TimeoutError);
+
+    // The wait() timeout started first and has the same 24-hour cap, so it fires before a second poll.
+    await vi.advanceTimersByTimeAsync(MAX_TIMEOUT_MS - 1);
+    expect(captured.requests).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
     await rejection;
     expect(captured.requests).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(NOT_POSITIVE)("%s polls again without waiting", async (_label, interval) => {
+    vi.useFakeTimers();
+    const { fetch, captured } = mockFetch((_req, n) => (n < 3 ? pendingVideo() : jsonResponse(doneVideo)));
+    const pending = waitForVideo(fetch, { interval });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(captured.requests).toHaveLength(3);
+    expect((await pending).status).toBe("done");
     expect(vi.getTimerCount()).toBe(0);
   });
 });

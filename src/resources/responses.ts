@@ -1,5 +1,5 @@
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
-import { CLIENT_REQUEST_ID_HEADER } from "../constants.js";
+import { CLIENT_REQUEST_ID_HEADER, MAX_TIMEOUT_MS } from "../constants.js";
 import { RetryBudget, send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { ModelResponse } from "../response.js";
@@ -69,7 +69,7 @@ export class Responses {
   /** Streaming keeps long requests alive where runtimes cap the wait for headers, such as Node at 5 minutes. */
   async #streamToResponse(payload: Record<string, unknown>, opts?: RequestOpts): Promise<ModelResponse> {
     // Reasoning can run silently for minutes, so only a per-request idleTimeout applies.
-    const streamOpts = { ...opts, idleTimeout: opts?.idleTimeout ?? 0 };
+    const streamOpts = { ...opts, idleTimeout: opts?.idleTimeout ?? MAX_TIMEOUT_MS };
     const budget = this.#retryBudget(opts);
     const result = await send(this.client, {
       method: "POST",

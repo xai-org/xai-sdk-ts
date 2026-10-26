@@ -7,6 +7,7 @@ import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_TIMEOUT_MS,
   IDEMPOTENT_RETRY_STATUS,
+  MAX_TIMEOUT_MS,
   RATE_LIMIT_BACKOFF_MS,
   RETRYABLE_STATUS,
   SDK_USER_AGENT,
@@ -142,24 +143,21 @@ export class RetryBudget {
 }
 
 /**
- * The longest delay `setTimeout` keeps. Node and browsers store it as a signed 32-bit integer, and a
- * larger one, `Infinity` included, overflows and fires at once.
+ * The delay to hand `setTimeout` for `ms`. `Infinity` and anything past `MAX_TIMEOUT_MS` give `MAX_TIMEOUT_MS`,
+ * and a value that isn't positive, `NaN` included, gives 0.
  */
-export const MAX_TIMER_MS = 2_147_483_647;
+export function delayMs(ms: number): number {
+  return ms > 0 ? Math.min(ms, MAX_TIMEOUT_MS) : 0;
+}
 
-/**
- * The delay to hand `setTimeout` for a deadline of `ms`, or `undefined` for `Infinity`, which never expires.
- * A delay past the timer range is capped at `MAX_TIMER_MS`, and one that isn't positive, `NaN` included, is 0.
- */
-export function deadlineMs(ms: number): number | undefined {
-  if (ms === Number.POSITIVE_INFINITY) return undefined;
-  return ms > 0 ? Math.min(ms, MAX_TIMER_MS) : 0;
+/** The delay for `timeout` or `idleTimeout`, where a value that isn't positive means the longest, `MAX_TIMEOUT_MS`. */
+function limitMs(ms: number): number {
+  return ms > 0 ? delayMs(ms) : MAX_TIMEOUT_MS;
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (!(ms > 0)) return Promise.resolve();
-  // A pause longer than the timer range waits as long as a timer can, instead of ending at once.
-  const delay = Math.min(ms, MAX_TIMER_MS);
+  const delay = delayMs(ms);
+  if (delay === 0) return Promise.resolve();
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(errorFromAbort(signal, null));
@@ -233,11 +231,9 @@ export function withQuery(url: string, query?: Record<string, string | number | 
   return u.toString();
 }
 
-function timeoutSignal(ms: number | undefined): { signal?: AbortSignal; cleanup: () => void } {
-  const delay = ms !== undefined && ms > 0 ? deadlineMs(ms) : undefined;
-  if (delay === undefined) return { cleanup: () => {} };
+function timeoutSignal(ms: number): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), delay);
+  const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), limitMs(ms));
   return { signal: controller.signal, cleanup: () => clearTimeout(timer) };
 }
 
@@ -620,13 +616,10 @@ async function readOnce(
       finish(() => reject(errorFromAbort(signal!, requestId)));
     };
     signal?.addEventListener("abort", onAbort, { once: true });
-    const idleDelay = idleTimeout > 0 ? deadlineMs(idleTimeout) : undefined;
-    if (idleDelay !== undefined) {
-      idle = setTimeout(() => {
-        void reader.cancel().catch(() => {});
-        finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
-      }, idleDelay);
-    }
+    idle = setTimeout(() => {
+      void reader.cancel().catch(() => {});
+      finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
+    }, limitMs(idleTimeout));
     reader.read().then(
       (value) => finish(() => resolve(value)),
       (err) => finish(() => reject(err)),

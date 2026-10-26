@@ -861,7 +861,7 @@ if (result.status === "done") {
 
 `wait()` resolves once the status is no longer `pending`: `done`, `failed`, or `expired`. A failed result includes an `error` with a `code` and `message`. If `video.respect_moderation` is `false`, the video did not pass moderation and has no URL. Video URLs are temporary, so download the file promptly.
 
-`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. A `timeout` of `Infinity` waits with no limit. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the job: the video keeps generating and is billed when it finishes. The API has no way to cancel a video yet. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
+`wait()` polls every 5 seconds for up to 10 minutes. Pass `interval` and `timeout` in milliseconds to change this, and a `signal` to stop waiting. Both are capped at 24 hours, so a `timeout` of `Infinity` waits 24 hours. A timeout rejects with `TimeoutError`, so you can call `wait()` again. Neither a timeout nor an aborted `signal` cancels the job: the video keeps generating and is billed when it finishes. The API has no way to cancel a video yet. To check once without waiting, call `client.videos.get(request_id)`, which returns `status: "pending"` until the video is ready.
 
 To animate a still image, pass it as `image`, and pass `last_frame` to choose the frame the video ends on. `image`, `last_frame`, `reference_images`, and keyframe images accept a public URL, a base64 data URL, a Files API `file_id`, or a `Blob` or `File`, which the SDK converts to a data URL before sending the request:
 
@@ -999,7 +999,7 @@ for await (const { batch_request_id, batch_result } of client.batches.results(ba
 }
 ```
 
-`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. A `timeout` of `Infinity` waits with no limit. A batch created from `input_file_id` has no requests until it has loaded the file, so `wait()` keeps polling a batch without requests until requests arrive, or until the batch is cancelled or expires. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
+`wait()` polls every 5 seconds and rejects with `TimeoutError` after 24 hours. Pass `interval`, `timeout`, or `signal` to change that. `interval` and `timeout` are capped at 24 hours, so a longer `timeout`, such as `Infinity`, also rejects after 24 hours. Call `wait()` again to keep waiting. A batch created from `input_file_id` has no requests until it has loaded the file, so `wait()` keeps polling a batch without requests until requests arrive, or until the batch is cancelled or expires. Results are available as soon as each request finishes, so you can read them before the whole batch completes. Use `client.batches.requests.list()` to check the state of individual requests, `client.batches.list()` to list your team's batches, and `client.batches.cancel()` to stop the remaining requests. Finished results stay available after cancelling.
 
 ## Voice
 
@@ -1258,7 +1258,7 @@ controller.abort();
 await pending;
 ```
 
-`timeout` bounds one attempt from the request to the end of its body, and `idleTimeout` bounds the gap between two chunks of a body. Both are milliseconds; `0` or `Infinity` means no limit.
+`timeout` bounds one attempt from the request to the end of its body, and `idleTimeout` bounds the gap between two chunks of a body. Both are milliseconds, capped at 24 hours: `0`, `Infinity`, or a longer value means 24 hours.
 
 Requests that generate content, such as `responses.create`, `images.generate`, and `images.edit`, retry only explicit `429` responses by default. Read-only requests may also retry transient HTTP failures. Retry delays honor `Retry-After` and otherwise use jittered exponential backoff, which starts at 1 second for a `429`.
 

@@ -4,10 +4,14 @@ All notable changes to the SpaceXAI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Changed
+
+- `timeout`, `idleTimeout`, and the `timeout` and `interval` of `videos.wait()` and `batches.wait()` are capped at 24 hours, so none of them waits without a limit. A longer value means 24 hours, and so does a `timeout` or `idleTimeout` of `0` or less, which used to mean no limit. A `wait()` timeout of `0` or less still expires at once, and an `interval` of `0` or less still polls again without a pause. A `wait()` that times out rejects with `TimeoutError`, so call it again to wait longer.
+
 ### Fixed
 
 - With `retryBeforeOutput`, a streamed `responses.create()` whose connection drops after the `200` headers but before the first byte of the event stream is retried, like a connection that fails before the headers. It used to reject with `APIConnectionError` after one request, while a drop after the first byte was retried. An idle or per-attempt timeout, or a caller abort, before the first byte still fails the call, and the default without `retryBeforeOutput` is unchanged.
-- `timeout`, `idleTimeout`, and the `timeout` of `videos.wait()` and `batches.wait()` accept `Infinity` as "no limit", and a value past the timer range (about 24.8 days) waits as long as a timer can. Node and browsers keep a timer delay in a signed 32-bit integer, and a larger one overflows, so these values used to time out at once; an `interval` of `Infinity` used to poll every millisecond. `NaN` now counts as `0` for all of these options, so a `timeout` of `NaN` means no limit instead of timing out at once.
+- `Infinity`, or a value of more than about 24.8 days, no longer makes `timeout`, `idleTimeout`, or a `wait()` timeout expire at once, or a `wait()` interval poll every millisecond. Node and browsers keep a timer delay in a signed 32-bit integer, and a larger one overflows. These values now mean 24 hours. `NaN` counts as `0` for all of these options, so a `timeout` of `NaN` now means 24 hours instead of timing out at once.
 
 ## [0.2.5] - 2026-10-23
 
