@@ -233,6 +233,11 @@ export function shouldRetryStatus(method: string, status: number, retryServerErr
   return isReadOnlyMethod(method) && IDEMPOTENT_RETRY_STATUS.has(status);
 }
 
+/** A stream that sent a 200 but no bytes failed before any output, so `retryBeforeOutput` covers it like a failed connect. */
+function canRetryBeforeFirstByte(req: InternalRequest, budget: RetryBudget, error: APIError): boolean {
+  return Boolean(req.retryServerErrors) && budget.canRetry && error.name === "APIConnectionError";
+}
+
 function isRedirectFailure(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
   return /redirect/i.test(message);
@@ -421,7 +426,12 @@ async function sendWithRetries(
         if (!response.body) {
           cleanupAttempt();
           if (binary) return { response, http, payload: undefined, body: null, sawByte: false };
-          throw new APIConnectionError("SSE response had no body", { requestId: lastRequestId });
+          const noBody = new APIConnectionError("SSE response had no body", { requestId: lastRequestId });
+          if (canRetryBeforeFirstByte(req, budget, noBody)) {
+            await sleep(retryDelayMs(budget.spend(), null), req.opts?.signal);
+            continue;
+          }
+          throw noBody;
         }
         const peeked = await peekFirstChunk(
           response,
@@ -431,7 +441,14 @@ async function sendWithRetries(
           cleanupAttempt,
         );
         if (peeked.error) cleanupAttempt();
-        if (peeked.error && !peeked.sawByte) throw peeked.error;
+        if (peeked.error && !peeked.sawByte) {
+          // Nothing reached us, so for `retryBeforeOutput` a dropped connection here is like one before the headers.
+          if (!signal?.aborted && canRetryBeforeFirstByte(req, budget, peeked.error)) {
+            await sleep(retryDelayMs(budget.spend(), null), req.opts?.signal);
+            continue;
+          }
+          throw peeked.error;
+        }
         return { response, http, payload: undefined, body: peeked.stream, sawByte: peeked.sawByte };
       }
 
