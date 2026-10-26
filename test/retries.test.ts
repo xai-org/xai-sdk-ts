@@ -199,6 +199,38 @@ describe("retryBeforeOutput", () => {
     expect(captured.requests).toHaveLength(2);
   });
 
+  it("counts a drop before the first byte against the budget shared with HTTP and stream retries", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { fetch, captured } = mockFetch((_req, n) => {
+      if (n === 1) {
+        return jsonResponse({ error: { message: "rate limited" } }, { status: 429, headers: { "retry-after": "0" } });
+      }
+      if (n === 2) return erroringSse(true);
+      if (n === 3) return sseResponse([created, unavailable]);
+      return sseResponse(succeeded);
+    });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 3, retryBeforeOutput: true });
+    const response = await client.responses.create(createBody);
+    expect(response.toText()).toBe("Hello world");
+    expect(captured.requests).toHaveLength(4);
+    expect(new Set(captured.requests.map((req) => req.headers.get("x-client-request-id"))).size).toBe(1);
+  });
+
+  it("retries a drop before the first byte on the resend after a stream error", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { fetch, captured } = mockFetch((_req, n) => {
+      if (n === 1) return sseResponse([created, unavailable]);
+      if (n === 2) return erroringSse(true);
+      return sseResponse(succeeded);
+    });
+    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const stream = await client.responses.create({ ...createBody, stream: true });
+    const types: Array<string> = [];
+    for await (const event of stream) types.push(event.type);
+    expect(types).toEqual(succeeded.map((event) => event.type));
+    expect(captured.requests).toHaveLength(3);
+  });
+
   it("doesn't retry an idle timeout before the first byte", async () => {
     const { fetch, captured } = mockFetch(() => sseResponse([], { hang: true }));
     const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
