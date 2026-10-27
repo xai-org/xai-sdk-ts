@@ -1,4 +1,4 @@
-import { combineSignals, sleep } from "../http.js";
+import { combineSignals, delayMs, sleep } from "../http.js";
 import { APIProtocolError, TimeoutError, requestIds } from "../errors.js";
 import type { HttpMeta } from "../types.js";
 
@@ -34,9 +34,10 @@ export async function pollUntil<T>(
   { interval, timeout, signal, label }: PollOptions,
 ): Promise<T> {
   const deadline = new AbortController();
+  const delay = delayMs(timeout);
   const timer = setTimeout(() => {
-    deadline.abort(new TimeoutError(`${label} did not finish within ${timeout}ms`));
-  }, timeout);
+    deadline.abort(new TimeoutError(`${label} did not finish within ${delay}ms`));
+  }, delay);
   const combined = combineSignals([signal, deadline.signal]);
   try {
     while (true) {

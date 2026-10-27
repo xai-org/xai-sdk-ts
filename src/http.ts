@@ -7,6 +7,7 @@ import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_TIMEOUT_MS,
   IDEMPOTENT_RETRY_STATUS,
+  MAX_TIMEOUT_MS,
   RATE_LIMIT_BACKOFF_MS,
   RETRYABLE_STATUS,
   SDK_USER_AGENT,
@@ -141,8 +142,22 @@ export class RetryBudget {
   }
 }
 
+/**
+ * The delay to hand `setTimeout` for `ms`. `Infinity` and anything past `MAX_TIMEOUT_MS` give `MAX_TIMEOUT_MS`,
+ * and a value that isn't positive, `NaN` included, gives 0.
+ */
+export function delayMs(ms: number): number {
+  return ms > 0 ? Math.min(ms, MAX_TIMEOUT_MS) : 0;
+}
+
+/** The delay for `timeout` or `idleTimeout`, where a value that isn't positive means the longest, `MAX_TIMEOUT_MS`. */
+function limitMs(ms: number): number {
+  return ms > 0 ? delayMs(ms) : MAX_TIMEOUT_MS;
+}
+
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  if (ms <= 0) return Promise.resolve();
+  const delay = delayMs(ms);
+  if (delay === 0) return Promise.resolve();
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(errorFromAbort(signal, null));
@@ -155,7 +170,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
       resolve();
-    }, ms);
+    }, delay);
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
@@ -216,10 +231,9 @@ export function withQuery(url: string, query?: Record<string, string | number | 
   return u.toString();
 }
 
-function timeoutSignal(ms: number | undefined): { signal?: AbortSignal; cleanup: () => void } {
-  if (ms === undefined || ms <= 0) return { cleanup: () => {} };
+function timeoutSignal(ms: number): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), ms);
+  const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), limitMs(ms));
   return { signal: controller.signal, cleanup: () => clearTimeout(timer) };
 }
 
@@ -231,6 +245,11 @@ export function shouldRetryStatus(method: string, status: number, retryServerErr
   if (RETRYABLE_STATUS.has(status)) return true;
   if (retryServerErrors && SERVER_ERROR_RETRY_STATUS.has(status)) return true;
   return isReadOnlyMethod(method) && IDEMPOTENT_RETRY_STATUS.has(status);
+}
+
+/** A stream that sent a 200 but no bytes failed before any output, so `retryBeforeOutput` covers it like a failed connect. */
+function canRetryBeforeFirstByte(req: InternalRequest, budget: RetryBudget, error: APIError): boolean {
+  return Boolean(req.retryServerErrors) && budget.canRetry && error.name === "APIConnectionError";
 }
 
 function isRedirectFailure(err: unknown): boolean {
@@ -418,10 +437,9 @@ async function sendWithRetries(
             requestId: lastRequestId,
           });
         }
-        if (!response.body) {
+        if (binary && !response.body) {
           cleanupAttempt();
-          if (binary) return { response, http, payload: undefined, body: null, sawByte: false };
-          throw new APIConnectionError("SSE response had no body", { requestId: lastRequestId });
+          return { response, http, payload: undefined, body: null, sawByte: false };
         }
         const peeked = await peekFirstChunk(
           response,
@@ -431,7 +449,14 @@ async function sendWithRetries(
           cleanupAttempt,
         );
         if (peeked.error) cleanupAttempt();
-        if (peeked.error && !peeked.sawByte) throw peeked.error;
+        if (peeked.error && !peeked.sawByte) {
+          // Nothing reached us, so for `retryBeforeOutput` a dropped connection here is like one before the headers.
+          if (!signal?.aborted && canRetryBeforeFirstByte(req, budget, peeked.error)) {
+            await sleep(retryDelayMs(budget.spend(), null), req.opts?.signal);
+            continue;
+          }
+          throw peeked.error;
+        }
         return { response, http, payload: undefined, body: peeked.stream, sawByte: peeked.sawByte };
       }
 
@@ -591,12 +616,10 @@ async function readOnce(
       finish(() => reject(errorFromAbort(signal!, requestId)));
     };
     signal?.addEventListener("abort", onAbort, { once: true });
-    if (idleTimeout > 0) {
-      idle = setTimeout(() => {
-        void reader.cancel().catch(() => {});
-        finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
-      }, idleTimeout);
-    }
+    idle = setTimeout(() => {
+      void reader.cancel().catch(() => {});
+      finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
+    }, limitMs(idleTimeout));
     reader.read().then(
       (value) => finish(() => resolve(value)),
       (err) => finish(() => reject(err)),

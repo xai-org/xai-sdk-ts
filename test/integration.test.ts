@@ -81,6 +81,28 @@ describe("native fetch integration", () => {
     expect(stream.http.requestId).toBe("req_stream_socket");
   });
 
+  it("retries a connection dropped after the 200 headers, before the first byte, with retryBeforeOutput", async () => {
+    let requests = 0;
+    const baseURL = await listen((_request, response) => {
+      requests += 1;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      if (requests === 1) {
+        response.flushHeaders();
+        setTimeout(() => response.destroy(), 20);
+        return;
+      }
+      response.end(`data: ${JSON.stringify({ type: "response.completed", response: completedResponse })}\n\n`);
+    });
+    const result = await new SpaceXAI({
+      apiKey: "test-key",
+      baseURL,
+      maxRetries: 1,
+      retryBeforeOutput: true,
+    }).responses.create(createBody);
+    expect(result.id).toBe("resp_123");
+    expect(requests).toBe(2);
+  });
+
   it("does not follow a 307 redirect with credentials or prompt body", async () => {
     let reachedRedirectTarget = false;
     const baseURL = await listen((request, response) => {

@@ -3,6 +3,11 @@ import { SDK_VERSION } from "./version.js";
 export const DEFAULT_BASE_URL = "https://api.x.ai/v1";
 export const DEFAULT_TIMEOUT_MS = 3_600_000;
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000;
+/**
+ * The longest a `timeout`, `idleTimeout`, `wait()` timeout, or poll interval runs: 24 hours. It must stay below
+ * 2^31 - 1 ms, the longest delay `setTimeout` keeps before it overflows and fires at once.
+ */
+export const MAX_TIMEOUT_MS = 86_400_000;
 export const DEFAULT_MAX_RETRIES = 2;
 export const DEFAULT_MAX_RESPONSE_BODY_BYTES = 32 * 1024 * 1024;
 export const DEFAULT_MAX_ERROR_BODY_BYTES = 1024 * 1024;
