@@ -21,7 +21,7 @@ import type {
   VoiceList,
 } from "../types.js";
 import type { VoiceId } from "../generated/voice.js";
-import type { SpaceXAI } from "../client.js";
+import type { SpaceXSI } from "../client.js";
 
 const AUDIO_FORMATS = new Set<string>([
   "pcm",
@@ -96,7 +96,7 @@ export class VoiceResource {
   readonly custom: CustomVoices;
   readonly clientSecrets: ClientSecrets;
 
-  constructor(private readonly client: SpaceXAI) {
+  constructor(private readonly client: SpaceXSI) {
     this.custom = new CustomVoices(client);
     this.clientSecrets = new ClientSecrets(client);
   }
@@ -183,7 +183,7 @@ export class VoiceResource {
 }
 
 export class CustomVoices {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   async create(
     body: CustomVoiceCreateParams,
@@ -275,7 +275,7 @@ export class CustomVoices {
 }
 
 export class ClientSecrets {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   async create(
     body: ClientSecretCreateParams = {},

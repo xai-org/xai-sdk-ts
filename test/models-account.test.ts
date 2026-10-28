@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APIProtocolError, SpaceXAI } from "../src/index.js";
+import { APIProtocolError, SpaceXSI } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
 const languageModel = {
@@ -39,8 +39,8 @@ const apiKeyInfo = {
   api_key_disabled: false,
 };
 
-function client(fetch: typeof globalThis.fetch): SpaceXAI {
-  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXSI {
+  return new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 describe("models.language", () => {
@@ -80,7 +80,7 @@ describe("account", () => {
   });
 });
 
-type Call = (c: SpaceXAI) => Promise<unknown>;
+type Call = (c: SpaceXSI) => Promise<unknown>;
 
 const listLanguageModels: Call = (c) => c.models.language.list();
 const getLanguageModel: Call = (c) => c.models.language.get("grok-4.6");

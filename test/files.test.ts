@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SpaceXAI, BinaryResponse } from "../src/index.js";
+import { SpaceXSI, BinaryResponse } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
 const fileObject = {
@@ -14,8 +14,8 @@ const fileObject = {
 
 const publicUrl = "https://files-cdn.x.ai/ZsqeMtdcSYWPPHTQdxXDKQ/file_1.png";
 
-function client(fetch: typeof globalThis.fetch): SpaceXAI {
-  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXSI {
+  return new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 describe("files.upload", () => {
@@ -202,7 +202,7 @@ describe("files public URLs", () => {
 });
 
 describe("file response validation", () => {
-  const cases: Array<[string, (files: SpaceXAI["files"]) => Promise<unknown>, unknown]> = [
+  const cases: Array<[string, (files: SpaceXSI["files"]) => Promise<unknown>, unknown]> = [
     ["an upload without id", (files) => files.upload({ file: new Blob(["x"]), filename: "x.txt" }), { object: "file" }],
     ["a non-object file", (files) => files.get("file_1"), "not json"],
     ["a file with an empty id", (files) => files.get("file_1"), { ...fileObject, id: "" }],

@@ -2,10 +2,10 @@ import { send } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { requireRecord } from "./shared.js";
 import type { HttpMeta, RequestOpts, TokenizeParams, TokenizeResponse } from "../types.js";
-import type { SpaceXAI } from "../client.js";
+import type { SpaceXSI } from "../client.js";
 
 export class Tokenizer {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   async encode(
     params: TokenizeParams,

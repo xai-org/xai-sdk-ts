@@ -27,7 +27,7 @@ export type ReasoningItem = Omit<Schema["Reasoning"], "type"> & {
 export type ImageGenerationCall = Schema["ImageGenerationCall"];
 type ServerCall<S, T extends ServerToolCallType> = Omit<S, "type"> & { type: T };
 /**
- * A tool call that SpaceXAI runs itself, such as web search, X search, code execution, or image generation.
+ * A tool call that SpaceXSI runs itself, such as web search, X search, code execution, or image generation.
  * Check `type` before reading fields of a specific tool. X search calls arrive as `custom_tool_call`, with
  * `name` set to the search that ran and its arguments as a JSON string in `input`.
  */
@@ -42,7 +42,7 @@ export type ServerToolCall =
   | ServerCall<Schema["ImageGenerationCall"], "image_generation_call">;
 /** A tool call that your code runs: one of your function tools, or a shell command. */
 export type ClientToolCall = FunctionToolCall | ShellCall;
-/** Any tool call, whether your code or SpaceXAI runs it. Check `type` to tell them apart. */
+/** Any tool call, whether your code or SpaceXSI runs it. Check `type` to tell them apart. */
 export type ToolCall = ClientToolCall | ServerToolCall;
 export type UrlCitation = Omit<Schema["Annotation"], "type"> & { type: "url_citation" };
 export type IncompleteDetails = Schema["IncompleteDetails"];
@@ -135,7 +135,7 @@ type ImageRequestFields = {
   quality?: "low" | "medium" | "auto" | null;
   /**
    * Upload each image with HTTP PUT to the matching signed URL in `upload_urls`, one per image, instead of
-   * storing it with SpaceXAI. Each image's `url` is then its upload URL. Requires `response_format: "url"`.
+   * storing it with SpaceXSI. Each image's `url` is then its upload URL. Requires `response_format: "url"`.
    */
   output?: Schema["ImageOutput"] | null;
 };

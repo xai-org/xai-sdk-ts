@@ -20,7 +20,7 @@ import type { ClientOptions, RequestHook, ResponseHook } from "./types.js";
 
 const INSPECT = Symbol.for("nodejs.util.inspect.custom");
 
-export class SpaceXAI {
+export class SpaceXSI {
   readonly baseURL: string;
   readonly timeout: number;
   readonly idleTimeout: number;
@@ -46,7 +46,7 @@ export class SpaceXAI {
     assertNodeVersion();
     if (isBrowser() && !opts.dangerouslyAllowBrowser) {
       throw new Error(
-        "SpaceXAI: browser and worker use is disabled because it can expose secret API credentials; " +
+        "SpaceXSI: browser and worker use is disabled because it can expose secret API credentials; " +
           "set dangerouslyAllowBrowser: true only if you understand the risk",
       );
     }
@@ -54,8 +54,8 @@ export class SpaceXAI {
     if (!apiKey) {
       throw new Error(
         isNode()
-          ? "SpaceXAI: apiKey is missing (set XAI_API_KEY or pass apiKey)"
-          : "SpaceXAI: pass apiKey from a server; do not use a secret API key in browsers or Workers",
+          ? "SpaceXSI: apiKey is missing (set XAI_API_KEY or pass apiKey)"
+          : "SpaceXSI: pass apiKey from a server; do not use a secret API key in browsers or Workers",
       );
     }
     storeApiKey(this, apiKey);
@@ -92,3 +92,8 @@ export class SpaceXAI {
     };
   }
 }
+
+/** @deprecated Renamed to `SpaceXSI`, which this is an alias of. */
+export const SpaceXAI = SpaceXSI;
+/** @deprecated Renamed to `SpaceXSI`, which this is an alias of. */
+export type SpaceXAI = SpaceXSI;

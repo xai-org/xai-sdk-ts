@@ -8,7 +8,7 @@ import { PagePromise } from "../pagination.js";
 import { requireRecord } from "./shared.js";
 import type { CompactParams, CreateParams, HttpMeta, RequestOpts } from "../types.js";
 import type { CompactResponse, DeletedResponse, InputItemList } from "../types.js";
-import type { SpaceXAI } from "../client.js";
+import type { SpaceXSI } from "../client.js";
 
 function wantsJson(body: CreateParams): boolean {
   const type = body.text?.format?.type;
@@ -18,7 +18,7 @@ function wantsJson(body: CreateParams): boolean {
 export class Responses {
   readonly inputItems: InputItems;
 
-  constructor(private readonly client: SpaceXAI) {
+  constructor(private readonly client: SpaceXSI) {
     this.inputItems = new InputItems(client);
   }
 
@@ -182,7 +182,7 @@ export class Responses {
 }
 
 export class InputItems {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   list(
     id: string,

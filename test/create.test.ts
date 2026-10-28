@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
-import { type CreateParams, SpaceXAI, SDK_VERSION } from "../src/index.js";
+import { type CreateParams, SpaceXAI, SpaceXSI, SDK_VERSION } from "../src/index.js";
 import { completedResponse, createBody, jsonResponse, mockFetch, usageFixture } from "./helpers.js";
 
-function client(fetch: typeof globalThis.fetch): SpaceXAI {
-  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXSI {
+  return new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 describe("responses.create", () => {
@@ -11,9 +11,9 @@ describe("responses.create", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     vi.stubGlobal("window", { document: {} });
     try {
-      expect(() => new SpaceXAI({ apiKey: "test-key", fetch })).toThrow(/use is disabled/);
+      expect(() => new SpaceXSI({ apiKey: "test-key", fetch })).toThrow(/use is disabled/);
       expect(
-        () => new SpaceXAI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
+        () => new SpaceXSI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
       ).not.toThrow();
     } finally {
       vi.unstubAllGlobals();
@@ -24,9 +24,9 @@ describe("responses.create", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     vi.stubGlobal("WorkerGlobalScope", class WorkerGlobalScope {});
     try {
-      expect(() => new SpaceXAI({ apiKey: "test-key", fetch })).toThrow(/worker use is disabled/);
+      expect(() => new SpaceXSI({ apiKey: "test-key", fetch })).toThrow(/worker use is disabled/);
       expect(
-        () => new SpaceXAI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
+        () => new SpaceXSI({ apiKey: "test-key", fetch, dangerouslyAllowBrowser: true }),
       ).not.toThrow();
     } finally {
       vi.unstubAllGlobals();
@@ -134,7 +134,7 @@ describe("responses.create", () => {
 
   it("keeps SDK attribution headers when the caller sets them", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    await new SpaceXAI({
+    await new SpaceXSI({
       apiKey: "test-key",
       fetch,
       maxRetries: 0,
@@ -152,7 +152,7 @@ describe("responses.create", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
     const onRequest = vi.fn();
     const onResponse = vi.fn();
-    const c = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0, onRequest, onResponse });
+    const c = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0, onRequest, onResponse });
     await c.responses.create(createBody);
     expect(onRequest).toHaveBeenCalledOnce();
     expect(onResponse).toHaveBeenCalledOnce();
@@ -251,5 +251,19 @@ describe("responses.create", () => {
       "GET https://api.x.ai/v1/models",
       "GET https://api.x.ai/v1/models/grok-4.6",
     ]);
+  });
+});
+
+describe("SpaceXAI", () => {
+  it("is the same client as SpaceXSI, for code written before the rename", async () => {
+    const { fetch } = mockFetch(() => jsonResponse(completedResponse));
+    const legacy: SpaceXAI = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const current: SpaceXSI = legacy;
+
+    expect(SpaceXAI).toBe(SpaceXSI);
+    expect(current).toBeInstanceOf(SpaceXAI);
+    expect(client(fetch)).toBeInstanceOf(SpaceXAI);
+    expectTypeOf<SpaceXAI>().toEqualTypeOf<SpaceXSI>();
+    expect((await legacy.responses.create(createBody)).toText()).toBe("Hello world");
   });
 });

@@ -6,7 +6,7 @@ import {
   APIProtocolError,
   AbortError,
   TimeoutError,
-  SpaceXAI,
+  SpaceXSI,
 } from "../src/index.js";
 import { formatCurl, retryDelayMs, send, shouldRetryStatus } from "../src/http.js";
 import {
@@ -83,7 +83,7 @@ describe("http send", () => {
         data: [{ id: "grok-4.6", object: "model", created: 1, owned_by: "xai" }],
       });
     });
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 2 }).models.list();
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 2 }).models.list();
     expect(res.data[0]?.id).toBe("grok-4.6");
     expect(captured.requests).toHaveLength(2);
   });
@@ -93,7 +93,7 @@ describe("http send", () => {
       throw new TypeError("fetch failed");
     });
     try {
-      await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 1 }).responses.create(createBody);
+      await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 1 }).responses.create(createBody);
       throw new Error("expected failure");
     } catch (err) {
       expect(err).toBeInstanceOf(APIConnectionError);
@@ -107,7 +107,7 @@ describe("http send", () => {
       jsonResponse({ error: { message: "boom" } }, { status: 500 }),
     );
     await expect(
-      new SpaceXAI({ apiKey: "k", fetch, maxRetries: 2 }).responses.create(createBody),
+      new SpaceXSI({ apiKey: "k", fetch, maxRetries: 2 }).responses.create(createBody),
     ).rejects.toMatchObject({ status: 500 });
     expect(captured.requests).toHaveLength(1);
   });
@@ -128,7 +128,7 @@ describe("http send", () => {
         ),
     );
     await expect(
-      new SpaceXAI({ apiKey: "k", fetch, maxRetries: 2 }).responses.create(createBody),
+      new SpaceXSI({ apiKey: "k", fetch, maxRetries: 2 }).responses.create(createBody),
     ).rejects.toBeInstanceOf(APIConnectionError);
     expect(captured.requests).toHaveLength(1);
   });
@@ -141,7 +141,7 @@ describe("http send", () => {
       }),
     );
     await expect(
-      new SpaceXAI({
+      new SpaceXSI({
         apiKey: "k",
         fetch: success.fetch,
         maxRetries: 0,
@@ -156,7 +156,7 @@ describe("http send", () => {
       }),
     );
     await expect(
-      new SpaceXAI({
+      new SpaceXSI({
         apiKey: "k",
         fetch: failure.fetch,
         maxRetries: 0,
@@ -173,13 +173,13 @@ describe("http send", () => {
         }),
     );
     await expect(
-      new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, timeout: 20 }).responses.create(createBody),
+      new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0, timeout: 20 }).responses.create(createBody),
     ).rejects.toBeInstanceOf(TimeoutError);
   });
 
   it("applies the timeout while an onRequest hook is running", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    const client = new SpaceXAI({
+    const client = new SpaceXSI({
       apiKey: "k",
       fetch,
       maxRetries: 0,
@@ -194,7 +194,7 @@ describe("http send", () => {
     const { fetch, captured } = mockFetch(() =>
       jsonResponse({ error: { message: "bad key" } }, { status: 401 }),
     );
-    const client = new SpaceXAI({
+    const client = new SpaceXSI({
       apiKey: "k",
       fetch,
       maxRetries: 2,
@@ -214,7 +214,7 @@ describe("http send", () => {
     const { fetch, captured } = mockFetch(() =>
       jsonResponse({ error: { message: "bad key" } }, { status: 401 }),
     );
-    const client = new SpaceXAI({
+    const client = new SpaceXSI({
       apiKey: "k",
       fetch,
       maxRetries: 2,
@@ -231,7 +231,7 @@ describe("http send", () => {
 
   it("treats DELETE 204 as deleted", async () => {
     const { fetch } = mockFetch(() => new Response(null, { status: 204, headers: { "x-request-id": "req_test" } }));
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.delete("resp_123");
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.delete("resp_123");
     expect(res.deleted).toBe(true);
     expect(res.id).toBe("resp_123");
     expect(res.http.status).toBe(204);
@@ -239,7 +239,7 @@ describe("http send", () => {
 
   it("does not expose apiKey on the client or inspect output", () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
-    const client = new SpaceXAI({ apiKey: "super-secret", fetch });
+    const client = new SpaceXSI({ apiKey: "super-secret", fetch });
     expect(Object.keys(client)).not.toContain("apiKey");
     expect("apiKey" in client).toBe(false);
     expect(inspect(client)).not.toContain("super-secret");
@@ -252,7 +252,7 @@ describe("http send", () => {
         toText: "shadowed",
       }),
     );
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(typeof res.toText).toBe("function");
     expect(res.toText()).toBe("Hello world");
   });
@@ -265,7 +265,7 @@ describe("client request IDs", () => {
 
   it("sends a UUID and exposes it on the response", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(sentId(captured)).toMatch(UUID);
     expect(res.http.clientRequestId).toBe(sentId(captured));
   });
@@ -276,7 +276,7 @@ describe("client request IDs", () => {
         ? jsonResponse({ error: { message: "slow down" } }, { status: 429, headers: { "retry-after": "0" } })
         : jsonResponse(completedResponse),
     );
-    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 1 });
+    const client = new SpaceXSI({ apiKey: "k", fetch, maxRetries: 1 });
     await client.responses.create(createBody);
     await client.responses.create(createBody);
     expect(captured.requests).toHaveLength(3);
@@ -286,7 +286,7 @@ describe("client request IDs", () => {
 
   it("uses an ID from the caller's headers", async () => {
     const { fetch, captured } = mockFetch(() => jsonResponse(completedResponse));
-    const client = new SpaceXAI({
+    const client = new SpaceXSI({
       apiKey: "k",
       fetch,
       maxRetries: 0,
@@ -305,7 +305,7 @@ describe("client request IDs", () => {
     const offline = mockFetch(() => {
       throw new TypeError("fetch failed");
     });
-    const connectionError = await new SpaceXAI({ apiKey: "k", fetch: offline.fetch, maxRetries: 0 })
+    const connectionError = await new SpaceXSI({ apiKey: "k", fetch: offline.fetch, maxRetries: 0 })
       .responses.create(createBody)
       .catch((err: unknown) => err);
     expect(connectionError).toBeInstanceOf(APIConnectionError);
@@ -317,14 +317,14 @@ describe("client request IDs", () => {
           setTimeout(() => resolve(jsonResponse(completedResponse)), 5_000);
         }),
     );
-    const timeoutError = await new SpaceXAI({ apiKey: "k", fetch: slow.fetch, maxRetries: 0, timeout: 20 })
+    const timeoutError = await new SpaceXSI({ apiKey: "k", fetch: slow.fetch, maxRetries: 0, timeout: 20 })
       .responses.create(createBody)
       .catch((err: unknown) => err);
     expect(timeoutError).toBeInstanceOf(TimeoutError);
     expect(timeoutError).toMatchObject({ clientRequestId: sentId(slow.captured) });
 
     const rejected = mockFetch(() => jsonResponse({ error: { message: "bad input" } }, { status: 400 }));
-    const statusError = await new SpaceXAI({ apiKey: "k", fetch: rejected.fetch, maxRetries: 0 })
+    const statusError = await new SpaceXSI({ apiKey: "k", fetch: rejected.fetch, maxRetries: 0 })
       .responses.create(createBody)
       .catch((err: unknown) => err);
     expect(statusError).toMatchObject({
@@ -334,7 +334,7 @@ describe("client request IDs", () => {
     });
 
     const malformed = mockFetch(() => jsonResponse({ object: "response" }));
-    const protocolError = await new SpaceXAI({ apiKey: "k", fetch: malformed.fetch, maxRetries: 0 })
+    const protocolError = await new SpaceXSI({ apiKey: "k", fetch: malformed.fetch, maxRetries: 0 })
       .responses.create(createBody)
       .catch((err: unknown) => err);
     expect(protocolError).toBeInstanceOf(APIProtocolError);
@@ -343,7 +343,7 @@ describe("client request IDs", () => {
 
   it("attaches the ID to stream errors and error events", async () => {
     const dropped = mockFetch(() => erroringSse(false));
-    const stream = await new SpaceXAI({ apiKey: "k", fetch: dropped.fetch, maxRetries: 0 }).responses.create({
+    const stream = await new SpaceXSI({ apiKey: "k", fetch: dropped.fetch, maxRetries: 0 }).responses.create({
       ...createBody,
       stream: true,
     });
@@ -356,7 +356,7 @@ describe("client request IDs", () => {
     expect(streamError).toMatchObject({ requestId: "req_test", clientRequestId: sentId(dropped.captured) });
 
     const failed = mockFetch(() => sseResponse([{ type: "error", code: 500, message: "boom" }]));
-    const failing = await new SpaceXAI({ apiKey: "k", fetch: failed.fetch, maxRetries: 0 }).responses.create({
+    const failing = await new SpaceXSI({ apiKey: "k", fetch: failed.fetch, maxRetries: 0 }).responses.create({
       ...createBody,
       stream: true,
     });
@@ -395,7 +395,7 @@ describe("multipart requests and binary responses", () => {
       }
       return jsonResponse({ id: "file_1" });
     });
-    const result = await send(new SpaceXAI({ apiKey: "k", fetch, maxRetries: 1 }), {
+    const result = await send(new SpaceXSI({ apiKey: "k", fetch, maxRetries: 1 }), {
       method: "POST",
       path: "/files",
       body: form,
@@ -414,7 +414,7 @@ describe("multipart requests and binary responses", () => {
     const bytes = new Uint8Array([0xff, 0xfe, 0x00, 0xc3, 0x28, 0x80]);
     const { fetch, captured } = mockFetch(() => octetStream(bytes));
     const result = await send(
-      new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, maxResponseBodyBytes: 2 }),
+      new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0, maxResponseBodyBytes: 2 }),
       download,
     );
     expect(captured.requests[0]?.headers.get("accept")).toBe("*/*");
@@ -424,7 +424,7 @@ describe("multipart requests and binary responses", () => {
 
   it("keeps a caller accept header on binary requests", async () => {
     const { fetch, captured } = mockFetch(() => octetStream("ID3"));
-    await send(new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }), {
+    await send(new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }), {
       ...download,
       opts: { headers: { accept: "audio/mpeg" } },
     });
@@ -433,7 +433,7 @@ describe("multipart requests and binary responses", () => {
 
   it("returns a null body for a binary 204 response", async () => {
     const { fetch } = mockFetch(() => new Response(null, { status: 204, headers: { "x-request-id": "req_test" } }));
-    const result = await send(new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }), download);
+    const result = await send(new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }), download);
     expect(result.http.status).toBe(204);
     expect(result.body).toBeNull();
   });
@@ -445,7 +445,7 @@ describe("multipart requests and binary responses", () => {
     });
     const { fetch } = mockFetch(() => octetStream(body));
     const result = await send(
-      new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 }),
+      new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 }),
       download,
     );
     await expect(new Response(result.body).arrayBuffer()).rejects.toBeInstanceOf(TimeoutError);
@@ -454,7 +454,7 @@ describe("multipart requests and binary responses", () => {
 
   it("attaches the client request ID when a binary body fails mid-read", async () => {
     const { fetch, captured } = mockFetch(() => octetStream(hangingBody()));
-    const file = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 }).files.content("file_1");
+    const file = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0, idleTimeout: 20 }).files.content("file_1");
     await expect(file.arrayBuffer()).rejects.toMatchObject({
       name: "TimeoutError",
       clientRequestId: captured.requests[0]?.headers.get("x-client-request-id"),
@@ -464,7 +464,7 @@ describe("multipart requests and binary responses", () => {
   it("aborts a binary body mid-read", async () => {
     const ac = new AbortController();
     const { fetch } = mockFetch(() => octetStream(hangingBody()));
-    const result = await send(new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }), {
+    const result = await send(new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }), {
       ...download,
       opts: { signal: ac.signal },
     });
@@ -479,7 +479,7 @@ describe("multipart requests and binary responses", () => {
     const { fetch } = mockFetch(() =>
       jsonResponse({ error: { message: "File not found" } }, { status: 404 }),
     );
-    await expect(send(new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }), download)).rejects.toMatchObject({
+    await expect(send(new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }), download)).rejects.toMatchObject({
       name: "NotFoundError",
       status: 404,
       message: "File not found",

@@ -67,26 +67,29 @@ try {
     JSON.stringify({ private: true, type: "module" }),
   );
   await writeFile(path.join(TEMP, "esm.mjs"), `
-    import { SDK_USER_AGENT, SDK_VERSION, SpaceXAI } from "@xai-official/sdk";
+    import { SDK_USER_AGENT, SDK_VERSION, SpaceXAI, SpaceXSI } from "@xai-official/sdk";
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad ESM version");
     if (SDK_USER_AGENT !== \`xai-sdk/\${SDK_VERSION} (typescript)\`) throw new Error("bad ESM user agent");
-    if (typeof SpaceXAI !== "function") throw new Error("missing ESM client");
-    if (typeof new SpaceXAI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing ESM images");
+    if (typeof SpaceXSI !== "function") throw new Error("missing ESM client");
+    if (SpaceXAI !== SpaceXSI) throw new Error("missing ESM SpaceXAI alias");
+    if (typeof new SpaceXSI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing ESM images");
     const { xSearch } = await import("@xai-official/sdk/tools");
     if (xSearch().type !== "x_search") throw new Error("missing ESM tool helpers");
   `);
   await writeFile(path.join(TEMP, "cjs.cjs"), `
-    const { SDK_USER_AGENT, SDK_VERSION, SpaceXAI } = require("@xai-official/sdk");
+    const { SDK_USER_AGENT, SDK_VERSION, SpaceXAI, SpaceXSI } = require("@xai-official/sdk");
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad CJS version");
     if (SDK_USER_AGENT !== \`xai-sdk/\${SDK_VERSION} (typescript)\`) throw new Error("bad CJS user agent");
-    if (typeof SpaceXAI !== "function") throw new Error("missing CJS client");
-    if (typeof new SpaceXAI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing CJS images");
+    if (typeof SpaceXSI !== "function") throw new Error("missing CJS client");
+    if (SpaceXAI !== SpaceXSI) throw new Error("missing CJS SpaceXAI alias");
+    if (typeof new SpaceXSI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing CJS images");
     const { xSearch } = require("@xai-official/sdk/tools");
     if (xSearch().type !== "x_search") throw new Error("missing CJS tool helpers");
   `);
   await writeFile(path.join(TEMP, "consumer.ts"), `
     import {
       SpaceXAI,
+      SpaceXSI,
       isImageGenerationCall,
       type CreateParams,
       type DeletedResponse,
@@ -118,7 +121,9 @@ try {
       input: "test",
       tools: [{ type: "web_search" }],
     };
-    const client: SpaceXAI = new SpaceXAI({ apiKey: "test", fetch: globalThis.fetch });
+    const client: SpaceXSI = new SpaceXSI({ apiKey: "test", fetch: globalThis.fetch });
+    const legacyClient: SpaceXAI = new SpaceXAI({ apiKey: "test" });
+    const renamedClient: SpaceXSI = legacyClient;
     const imageModel: KnownImageModelId = "grok-imagine-image-2.0";
     const generate: ImageGenerateParams = {
       model: imageModel,
@@ -137,7 +142,7 @@ try {
     void client.voice.speak({ text: "Hi [pause] there.", language: "en" });
     // @ts-expect-error Unknown speech tags are type errors in string literals.
     void client.voice.speak({ text: "Hi [laff] there.", language: "en" });
-    void [model, futureModel, deleted, functionTool, webSearchTool, params, client, xSearchTool];
+    void [model, futureModel, deleted, functionTool, webSearchTool, params, client, renamedClient, xSearchTool];
     void [imageModel, generate, edit, imageResponse, imageTool, imageCalls];
   `);
   await writeFile(
