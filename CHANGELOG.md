@@ -4,12 +4,14 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-28
+
 ### Changed
 
+- **Behavior change:** `timeout`, `idleTimeout`, and the `timeout` and `interval` of `videos.wait()` and `batches.wait()` are capped at 24 hours, so none of them waits without a limit. A longer value means 24 hours, and so does a `timeout` or `idleTimeout` of `0` or less, which used to mean no limit. A `wait()` timeout of `0` or less still expires at once, and an `interval` of `0` or less still polls again without a pause. A `wait()` that times out rejects with `TimeoutError`, so call it again to wait longer.
 - Renamed the client class from `SpaceXAI` to `SpaceXSI`. `SpaceXAI` is still exported as a deprecated alias of the same class, so `new SpaceXAI()`, `instanceof SpaceXAI`, and the `SpaceXAI` type keep working, and editors mark them as deprecated. Replace `SpaceXAI` with `SpaceXSI` to drop the warning.
 - Client error messages start with `SpaceXSI:` instead of `SpaceXAI:`.
 - The README, package description and author, and doc comments say SpaceXSI.
-- `timeout`, `idleTimeout`, and the `timeout` and `interval` of `videos.wait()` and `batches.wait()` are capped at 24 hours, so none of them waits without a limit. A longer value means 24 hours, and so does a `timeout` or `idleTimeout` of `0` or less, which used to mean no limit. A `wait()` timeout of `0` or less still expires at once, and an `interval` of `0` or less still polls again without a pause. A `wait()` that times out rejects with `TimeoutError`, so call it again to wait longer.
 
 ### Fixed
 
