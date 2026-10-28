@@ -54,7 +54,7 @@ export function isKnownStreamEventType(type: string): type is KnownStreamEventTy
   return KNOWN_SET.has(type);
 }
 
-/** Output item types for tools that SpaceXAI runs itself. The API sends X search calls as `custom_tool_call` items. */
+/** Output item types for tools that SpaceXSI runs itself. The API sends X search calls as `custom_tool_call` items. */
 export const SERVER_TOOL_CALL_TYPES = [
   "web_search_call",
   "x_search_call",

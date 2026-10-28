@@ -1,7 +1,7 @@
 import { createServer, type RequestListener } from "node:http";
 import { once } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
-import { APIConnectionError, SpaceXAI } from "../src/index.js";
+import { APIConnectionError, SpaceXSI } from "../src/index.js";
 import { completedResponse, createBody } from "./helpers.js";
 
 const servers = new Set<ReturnType<typeof createServer>>();
@@ -41,7 +41,7 @@ describe("native fetch integration", () => {
       });
       response.end(JSON.stringify(completedResponse));
     });
-    const result = await new SpaceXAI({
+    const result = await new SpaceXSI({
       apiKey: "test-key",
       baseURL,
       maxRetries: 0,
@@ -67,7 +67,7 @@ describe("native fetch integration", () => {
         );
       }, 5);
     });
-    const stream = await new SpaceXAI({
+    const stream = await new SpaceXSI({
       apiKey: "test-key",
       baseURL,
       maxRetries: 0,
@@ -93,7 +93,7 @@ describe("native fetch integration", () => {
       }
       response.end(`data: ${JSON.stringify({ type: "response.completed", response: completedResponse })}\n\n`);
     });
-    const result = await new SpaceXAI({
+    const result = await new SpaceXSI({
       apiKey: "test-key",
       baseURL,
       maxRetries: 1,
@@ -116,7 +116,7 @@ describe("native fetch integration", () => {
       response.end();
     });
     await expect(
-      new SpaceXAI({ apiKey: "test-key", baseURL, maxRetries: 0 }).responses.create(createBody),
+      new SpaceXSI({ apiKey: "test-key", baseURL, maxRetries: 0 }).responses.create(createBody),
     ).rejects.toBeInstanceOf(APIConnectionError);
     expect(reachedRedirectTarget).toBe(false);
   });

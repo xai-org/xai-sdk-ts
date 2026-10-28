@@ -6,7 +6,7 @@ import {
   type InputItem,
   NotFoundError,
   TimeoutError,
-  SpaceXAI,
+  SpaceXSI,
 } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
@@ -36,8 +36,8 @@ const chatCompletion = {
   system_fingerprint: "fp_1944a19e1f",
 };
 
-function client(fetch: typeof globalThis.fetch): SpaceXAI {
-  return new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 0 });
+function client(fetch: typeof globalThis.fetch): SpaceXSI {
+  return new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
 }
 
 async function jsonBody(request: Request | undefined): Promise<Record<string, unknown>> {
@@ -180,7 +180,7 @@ describe("batches.wait", () => {
 
   it.each([
     ["cancelled", { cancel_time: "2025-11-11T12:00:04Z" }],
-    ["cancelled by SpaceXAI", { cancel_by_xai_message: "Batch cancelled by SpaceXAI" }],
+    ["cancelled by SpaceXSI", { cancel_by_xai_message: "Batch cancelled by SpaceXSI" }],
   ])("returns a batch without requests once it is %s", async (_label, cancellation) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-11-11T12:00:00Z"));
@@ -391,7 +391,7 @@ describe("batches.requests", () => {
 });
 
 describe("batch response validation", () => {
-  it.each<[string, (c: SpaceXAI) => Promise<unknown>, unknown, string]>([
+  it.each<[string, (c: SpaceXSI) => Promise<unknown>, unknown, string]>([
     [
       "a non-object batch",
       (c) => c.batches.create({ name: "My New Batch" }),

@@ -14,7 +14,7 @@ import type {
   VideoStartResponse,
   VideoWaitOptions,
 } from "../types.js";
-import type { SpaceXAI } from "../client.js";
+import type { SpaceXSI } from "../client.js";
 
 type GenerateVideoRequest = components["schemas"]["GenerateVideoRequest"];
 
@@ -33,7 +33,7 @@ function toStartResponse(result: SendResult): VideoStartResponse & { http: HttpM
 }
 
 export class Videos {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   async generate(
     body: VideoGenerateParams,

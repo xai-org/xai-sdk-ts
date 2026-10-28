@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ModelResponse, SpaceXAI } from "../src/index.js";
+import { ModelResponse, SpaceXSI } from "../src/index.js";
 import { completedResponse, createBody, erroringSse, jsonResponse, mockFetch, sseResponse } from "./helpers.js";
 
 describe("retries", () => {
@@ -13,7 +13,7 @@ describe("retries", () => {
       }
       return sseResponse([{ type: "response.completed", response: completedResponse }]);
     });
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     for await (const event of stream) types.push(event.type);
@@ -23,14 +23,14 @@ describe("retries", () => {
 
   it("does not retry POST after HTTP 200 when the stream errors before the first SSE byte", async () => {
     const { fetch, captured } = mockFetch(() => erroringSse(true));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2 });
     await expect(client.responses.create({ ...createBody, stream: true })).rejects.toThrow();
     expect(captured.requests).toHaveLength(1);
   });
 
   it("does not retry after the first SSE byte", async () => {
     const { fetch, captured } = mockFetch(() => erroringSse(false));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(async () => {
       for await (const _ of stream) {
@@ -47,7 +47,7 @@ describe("retries", () => {
         { status: 529, headers: { "retry-after": "0" } },
       ),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2 });
     await expect(client.responses.create(createBody)).rejects.toMatchObject({ status: 529 });
     expect(captured.requests).toHaveLength(1);
   });
@@ -69,7 +69,7 @@ describe("retryBeforeOutput", () => {
 
   it("is off by default", async () => {
     const { fetch, captured } = mockFetch(() => sseResponse([created, unavailable]));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2 });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2 });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(stream.done()).rejects.toMatchObject({ status: 503 });
     expect(captured.requests).toHaveLength(1);
@@ -82,7 +82,7 @@ describe("retryBeforeOutput", () => {
         ? sseResponse([created, unavailable], { headers: { "x-request-id": "req_1" } })
         : sseResponse(succeeded, { headers: { "x-request-id": "req_2" } }),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     for await (const event of stream) types.push(event.type);
@@ -95,7 +95,7 @@ describe("retryBeforeOutput", () => {
 
   it("doesn't retry once output has started", async () => {
     const { fetch, captured } = mockFetch(() => sseResponse([created, delta, unavailable]));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(stream.done()).rejects.toMatchObject({ status: 503 });
     expect(captured.requests).toHaveLength(1);
@@ -104,7 +104,7 @@ describe("retryBeforeOutput", () => {
   it("gives up after maxRetries and reports the last error", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const { fetch, captured } = mockFetch(() => sseResponse([created, unavailable]));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 1, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 1, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(stream.done()).rejects.toMatchObject({ status: 503 });
     expect(captured.requests).toHaveLength(2);
@@ -117,7 +117,7 @@ describe("retryBeforeOutput", () => {
         ? jsonResponse({ error: { message: "rate limited" } }, { status: 429, headers: { "retry-after": "0" } })
         : sseResponse([created, unavailable]),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(stream.done()).rejects.toMatchObject({ status: 503 });
     expect(captured.requests).toHaveLength(3);
@@ -127,7 +127,7 @@ describe("retryBeforeOutput", () => {
     const { fetch, captured } = mockFetch(() =>
       jsonResponse({ error: { message: "unavailable" } }, { status: 503, headers: { "retry-after": "0" } }),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     await expect(client.responses.create({ ...createBody, stream: false })).rejects.toMatchObject({ status: 503 });
     expect(captured.requests).toHaveLength(1);
   });
@@ -142,7 +142,7 @@ describe("retryBeforeOutput", () => {
       if (n === 3) return sseResponse([created, unavailable]);
       return sseResponse(succeeded);
     });
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 3 });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 3 });
     const response = await client.responses.create(createBody, { retryBeforeOutput: true });
     expect(response.toText()).toBe("Hello world");
     expect(captured.requests).toHaveLength(4);
@@ -155,7 +155,7 @@ describe("retryBeforeOutput", () => {
         ? erroringSse(true)
         : sseResponse(succeeded, { headers: { "x-request-id": "req_2" } }),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const response = await client.responses.create(createBody);
     expect(response.toText()).toBe("Hello world");
     expect(response.http.requestId).toBe("req_2");
@@ -167,7 +167,7 @@ describe("retryBeforeOutput", () => {
   it("retries a stream: true request whose connection drops before the first byte", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const { fetch, captured } = mockFetch((_req, n) => (n === 1 ? erroringSse(true) : sseResponse(succeeded)));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     for await (const event of stream) types.push(event.type);
@@ -182,7 +182,7 @@ describe("retryBeforeOutput", () => {
         ? new Response(null, { status: 200, headers: { "content-type": "text/event-stream" } })
         : sseResponse(succeeded),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const response = await client.responses.create(createBody);
     expect(response.toText()).toBe("Hello world");
     expect(captured.requests).toHaveLength(2);
@@ -191,7 +191,7 @@ describe("retryBeforeOutput", () => {
   it("stops retrying a connection that keeps dropping before the first byte once the budget is spent", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const { fetch, captured } = mockFetch(() => erroringSse(true));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 1, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 1, retryBeforeOutput: true });
     await expect(client.responses.create(createBody)).rejects.toMatchObject({
       name: "APIConnectionError",
       message: "socket hang up",
@@ -210,14 +210,14 @@ describe("retryBeforeOutput", () => {
       return sseResponse(succeeded);
     };
     const enough = mockFetch(handler);
-    const client = new SpaceXAI({ apiKey: "test-key", fetch: enough.fetch, maxRetries: 3, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch: enough.fetch, maxRetries: 3, retryBeforeOutput: true });
     const response = await client.responses.create(createBody);
     expect(response.toText()).toBe("Hello world");
     expect(enough.captured.requests).toHaveLength(4);
     expect(new Set(enough.captured.requests.map((req) => req.headers.get("x-client-request-id"))).size).toBe(1);
 
     const short = mockFetch(handler);
-    const shortClient = new SpaceXAI({ apiKey: "test-key", fetch: short.fetch, maxRetries: 2, retryBeforeOutput: true });
+    const shortClient = new SpaceXSI({ apiKey: "test-key", fetch: short.fetch, maxRetries: 2, retryBeforeOutput: true });
     await expect(shortClient.responses.create(createBody)).rejects.toMatchObject({ status: 503 });
     expect(short.captured.requests).toHaveLength(3);
   });
@@ -229,7 +229,7 @@ describe("retryBeforeOutput", () => {
       if (n === 2) return erroringSse(true);
       return sseResponse(succeeded);
     });
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     const types: Array<string> = [];
     for await (const event of stream) types.push(event.type);
@@ -242,7 +242,7 @@ describe("retryBeforeOutput", () => {
     ["a per-attempt timeout", { timeout: 20 }],
   ])("doesn't retry %s before the first byte", async (_label, opts) => {
     const { fetch, captured } = mockFetch(() => sseResponse([], { hang: true }));
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     await expect(client.responses.create({ ...createBody, stream: true }, opts)).rejects.toMatchObject({
       name: "TimeoutError",
     });
@@ -267,7 +267,7 @@ describe("retryBeforeOutput", () => {
         headers: { "content-type": "text/event-stream", "x-request-id": "req_1" },
       });
     });
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     await expect(client.responses.create(createBody, { signal: ac.signal })).rejects.toMatchObject({
       name: "AbortError",
       requestId: "req_1",
@@ -282,7 +282,7 @@ describe("retryBeforeOutput", () => {
         ? sseResponse([created], { headers: { "x-request-id": "req_1" } })
         : jsonResponse(completedResponse, { headers: { "x-request-id": "req_2" } }),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const response = await client.responses.create(createBody);
     expect(response).toBeInstanceOf(ModelResponse);
     expect(response.toText()).toBe("Hello world");
@@ -295,7 +295,7 @@ describe("retryBeforeOutput", () => {
     const { fetch, captured } = mockFetch((_req, n) =>
       n === 1 ? sseResponse([created]) : jsonResponse(completedResponse),
     );
-    const client = new SpaceXAI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 2, retryBeforeOutput: true });
     const stream = await client.responses.create({ ...createBody, stream: true });
     await expect(stream.done()).rejects.toMatchObject({
       name: "APIProtocolError",

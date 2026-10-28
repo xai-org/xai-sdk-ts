@@ -6,7 +6,7 @@ import {
   isFunctionCall,
   isMessage,
   isReasoning,
-  SpaceXAI,
+  SpaceXSI,
 } from "../src/index.js";
 import { inlineImageInput } from "../src/porcelain.js";
 import {
@@ -35,14 +35,14 @@ describe("porcelain", () => {
         ],
       }),
     );
-    return new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody).then((res) => {
+    return new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody).then((res) => {
       expect(res.toText()).toBe("AB");
     });
   });
 
   it("toInput echoes all output items including reasoning", async () => {
     const { fetch } = mockFetch(() => jsonResponse(completedResponse));
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     const next = res.toInput();
     expect(next).toHaveLength(2);
     expect(isReasoning(next[0])).toBe(true);
@@ -57,7 +57,7 @@ describe("porcelain", () => {
         output: [{ type: "function_call", name: "fn", arguments: "{}" }],
       }),
     );
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toBeNull();
     expect(() => res.toJson()).toThrow(/no output_text/);
   });
@@ -75,14 +75,14 @@ describe("porcelain", () => {
         ],
       }),
     );
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toBeNull();
     expect(() => res.toJson()).toThrow(SyntaxError);
   });
 
   it("toJson/parsed work for completed json_schema output", async () => {
     const { fetch } = mockFetch(() => jsonResponse(jsonSchemaResponse));
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     expect(res.parsed).toEqual({ ok: true });
     expect(res.toJson()).toEqual({ ok: true });
   });
@@ -95,7 +95,7 @@ describe("porcelain", () => {
         output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: JSON.stringify(script) }] }],
       }),
     );
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     const Line = z.object({ speaker: z.enum(["host", "guest"]), text: z.string() });
     const Script = z.object({
       title: z.string(),
@@ -121,7 +121,7 @@ describe("porcelain", () => {
 
   it("toJson accepts any Standard Schema validator", async () => {
     const { fetch } = mockFetch(() => jsonResponse(jsonSchemaResponse));
-    const res = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
+    const res = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create(createBody);
     const schema = <Output>(
       validate: (value: unknown) => { value: Output } | { issues: Array<StandardSchemaIssue> },
     ): StandardSchema<Output> => ({ "~standard": { version: 1, vendor: "test", validate } });
@@ -154,7 +154,7 @@ describe("porcelain", () => {
         },
       ]),
     );
-    const stream = await new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
+    const stream = await new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).responses.create({
       ...createBody,
       stream: true,
     });

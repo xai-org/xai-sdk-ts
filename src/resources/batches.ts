@@ -16,7 +16,7 @@ import type {
   HttpMeta,
   RequestOpts,
 } from "../types.js";
-import type { SpaceXAI } from "../client.js";
+import type { SpaceXSI } from "../client.js";
 
 const DEFAULT_WAIT_INTERVAL_MS = 5_000;
 const DEFAULT_WAIT_TIMEOUT_MS = 86_400_000;
@@ -32,7 +32,7 @@ function toBatch(result: SendResult): Batch & { http: HttpMeta } {
   return { ...(body as Batch), http: result.http };
 }
 
-/** Cancelled, by you or by SpaceXAI, or past its expiry time. */
+/** Cancelled, by you or by SpaceXSI, or past its expiry time. */
 function hasEnded(batch: Batch): boolean {
   if (batch.cancel_time != null || batch.cancel_by_xai_message != null) return true;
   return batch.expire_time != null && Date.parse(batch.expire_time) <= Date.now();
@@ -51,7 +51,7 @@ async function toWireRequest(request: BatchRequest, signal?: AbortSignal): Promi
 export class Batches {
   readonly requests: BatchRequests;
 
-  constructor(private readonly client: SpaceXAI) {
+  constructor(private readonly client: SpaceXSI) {
     this.requests = new BatchRequests(client);
   }
 
@@ -154,7 +154,7 @@ export class Batches {
 }
 
 export class BatchRequests {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   /**
    * `responses` requests are sent like `responses.create()` bodies: `Blob` images are

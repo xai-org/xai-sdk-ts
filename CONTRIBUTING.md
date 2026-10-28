@@ -1,4 +1,4 @@
-# Contributing to the SpaceXAI TypeScript SDK
+# Contributing to the SpaceXSI TypeScript SDK
 
 We aren't accepting outside contributions yet. While the SDK is new, we're collecting feedback through [GitHub issues](https://github.com/xai-org/xai-sdk-ts/issues), so please open an issue for bugs and feature requests instead of a pull request. We plan to accept outside contributions later.
 
@@ -11,7 +11,7 @@ The rest of this guide describes how maintainers develop and test the SDK.
 - Disclose third-party code and its license in the pull request.
 - Report vulnerabilities privately according to [SECURITY.md](./SECURITY.md).
 
-Version changes and releases are managed by SpaceXAI maintainers.
+Version changes and releases are managed by SpaceXSI maintainers.
 
 ## Development setup
 
@@ -29,7 +29,7 @@ Create a branch from `main` and make focused changes with tests and documentatio
 
 `src/generated/types.ts`, `src/generated/voice.ts`, `src/models.ts`, and `src/version.ts` are generated. Do not edit them directly.
 
-- Run `pnpm generate:types` to refresh OpenAPI types from the public SpaceXAI schema. It saves the schema to `spec/openapi.json`, and `pnpm test` checks that the types match it.
+- Run `pnpm generate:types` to refresh OpenAPI types from the public SpaceXSI schema. It saves the schema to `spec/openapi.json`, and `pnpm test` checks that the types match it.
 - When the schema gains a path, `pnpm generate:types` fails until you add the path to `KEEP_PATHS` in `scripts/openapi-paths.mjs` to generate its types, or to `IGNORED_PATHS` if the SDK won't wrap it.
 - Run `pnpm generate:models` to refresh known public model IDs.
 - Run `pnpm generate:voice` to refresh the speech tags, built-in voice IDs, and voice model IDs from the Voice docs.

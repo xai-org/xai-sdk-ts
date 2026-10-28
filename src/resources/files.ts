@@ -16,7 +16,7 @@ import type {
   HttpMeta,
   RequestOpts,
 } from "../types.js";
-import type { SpaceXAI } from "../client.js";
+import type { SpaceXSI } from "../client.js";
 
 function toFileObject(result: SendResult): FileObject & { http: HttpMeta } {
   const body = requireRecord(result.payload, result.http, "File");
@@ -30,7 +30,7 @@ function toFileObject(result: SendResult): FileObject & { http: HttpMeta } {
 }
 
 export class Files {
-  constructor(private readonly client: SpaceXAI) {}
+  constructor(private readonly client: SpaceXSI) {}
 
   async upload(params: FileUploadParams, opts?: RequestOpts): Promise<FileObject & { http: HttpMeta }> {
     const form = new FormData();

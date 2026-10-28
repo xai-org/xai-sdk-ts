@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MAX_TIMEOUT_MS } from "../src/constants.js";
-import { SpaceXAI, TimeoutError } from "../src/index.js";
+import { SpaceXSI, TimeoutError } from "../src/index.js";
 import { jsonResponse, mockFetch } from "./helpers.js";
 
 // Node and browsers keep a timer delay in a signed 32-bit integer, so 2^31 ms, about 24.8 days, overflows and
@@ -31,7 +31,7 @@ function pendingVideo(): Response {
 }
 
 function waitForVideo(fetch: typeof globalThis.fetch, opts: { interval?: number; timeout?: number }) {
-  return new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0 }).videos.wait("req_1", opts);
+  return new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0 }).videos.wait("req_1", opts);
 }
 
 afterEach(() => {
@@ -42,7 +42,7 @@ describe("request timeout", () => {
   it.each([...OVER_CAP, ...NOT_POSITIVE])("%s times out after 24 hours", async (_label, timeout) => {
     vi.useFakeTimers();
     const { fetch, captured } = mockFetch(() => new Promise<Response>(() => {}));
-    const pending = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, timeout }).responses.create({
+    const pending = new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0, timeout }).responses.create({
       model: "grok-4.7",
       input: "hi",
       stream: false,
@@ -75,7 +75,7 @@ describe("idleTimeout", () => {
     const { fetch } = mockFetch(
       () => new Response(body, { status: 200, headers: { "content-type": "application/octet-stream" } }),
     );
-    const client = new SpaceXAI({ apiKey: "k", fetch, maxRetries: 0, timeout: MAX_TIMEOUT_MS, idleTimeout });
+    const client = new SpaceXSI({ apiKey: "k", fetch, maxRetries: 0, timeout: MAX_TIMEOUT_MS, idleTimeout });
     const pending = client.files.content("file_1");
 
     await vi.advanceTimersByTimeAsync(MAX_TIMEOUT_MS - 1);

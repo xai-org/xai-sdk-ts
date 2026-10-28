@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates src/generated/types.ts from the official SpaceXAI HTTP OpenAPI spec and saves the spec, byte for
+ * Generates src/generated/types.ts from the official SpaceXSI HTTP OpenAPI spec and saves the spec, byte for
  * byte, in spec/openapi.json. Default: https://api.x.ai/api-docs/openapi.json
  *
  * Fails when the spec has a path that scripts/openapi-paths.mjs neither keeps nor ignores.

@@ -1,4 +1,4 @@
-export { SpaceXAI } from "./client.js";
+export { SpaceXSI, SpaceXAI } from "./client.js";
 export { SDK_VERSION } from "./version.js";
 export { SDK_USER_AGENT } from "./constants.js";
 export { ModelResponse } from "./response.js";

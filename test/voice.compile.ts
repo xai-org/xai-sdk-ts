@@ -10,7 +10,7 @@ import type {
   SpeechWithTimestamps,
   TranscriptionParams,
   UnsafeSpeechText,
-  SpaceXAI,
+  SpaceXSI,
   BinaryResponse,
   Voice,
 } from "../src/index.js";
@@ -21,7 +21,7 @@ type IsOptional<T, K extends keyof T> = {} extends Pick<T, K> ? true : false;
 type Equals<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
-export async function speakResults(client: SpaceXAI) {
+export async function speakResults(client: SpaceXSI) {
   return {
     audio: await client.voice.speak({ text: "Hello", language: "en" }),
     timed: await client.voice.speak({ text: "Hello", language: "en", with_timestamps: true }),
@@ -41,7 +41,7 @@ export type CustomVoiceFileIsRequired = Assert<
   IsOptional<CustomVoiceCreateParams, "file"> extends false ? true : false
 >;
 
-export async function speechTagChecks(client: SpaceXAI) {
+export async function speechTagChecks(client: SpaceXSI) {
   await client.voice.speak({ text: "Hi [new-tag] there." as UnsafeSpeechText, language: "en" });
   await client.voice.speak({ text: "They said [they] would come.", language: "en" });
   // @ts-expect-error `[laff]` is not a speech tag.
