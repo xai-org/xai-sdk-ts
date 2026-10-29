@@ -2,6 +2,7 @@ import type { KnownStreamEventType } from "../src/constants.js";
 import type {
   CreateParams,
   FunctionToolCall,
+  IncompleteDetails,
   InputItem,
   OutputMessage,
   ReasoningItem,
@@ -22,6 +23,10 @@ type FunctionTool = Extract<Tool, { type: "function" }>;
 type WebSearchTool = Extract<Tool, { type: "web_search" }>;
 type ReasoningConfig = NonNullable<CreateParams["reasoning"]>;
 type SearchParameters = NonNullable<CreateParams["search_parameters"]>;
+
+export type IncompleteReasons = Assert<
+  Equals<IncompleteDetails["reason"], "max_output_tokens" | "max_prompt_tokens" | "max_time_limit" | "content_filter">
+>;
 
 export type ModelIsRequired = Assert<
   IsOptional<CreateParams, "model"> extends false ? true : false

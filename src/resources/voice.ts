@@ -37,12 +37,17 @@ const AUDIO_FORMATS = new Set<string>([
   "m4a",
   "mkv",
   "webm",
+  "avi",
+  "mov",
 ] satisfies Array<AudioFileFormat>);
 /** MIME subtypes, without an `x-` prefix, whose format has another name. */
 const SUBTYPE_FORMATS = new Map([
   ["mpeg", "mp3"],
   ["wave", "wav"],
   ["matroska", "mkv"],
+  ["msvideo", "avi"],
+  ["vnd.avi", "avi"],
+  ["quicktime", "mov"],
 ]);
 
 /**
