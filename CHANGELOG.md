@@ -4,6 +4,8 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-29
+
 ### Added
 
 - `voice.transcribe()` takes `"webm"`, `"avi"`, and `"mov"` for `audio_format`. A `Blob` without a name is sent as `audio.avi` or `audio.mov` when its MIME type is `video/x-msvideo`, `video/avi`, `video/vnd.avi`, or `video/quicktime`, or when it has no MIME type and its first bytes show AVI or QuickTime. QuickTime files were sent as `audio.mp4` before, which the API also reads.
