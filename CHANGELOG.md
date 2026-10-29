@@ -4,6 +4,16 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+
+- `voice.transcribe()` takes `"webm"`, `"avi"`, and `"mov"` for `audio_format`. A `Blob` without a name is sent as `audio.avi` or `audio.mov` when its MIME type is `video/x-msvideo`, `video/avi`, `video/vnd.avi`, or `video/quicktime`, or when it has no MIME type and its first bytes show AVI or QuickTime. QuickTime files were sent as `audio.mp4` before, which the API also reads.
+- `guidelines` on `responses.create()` takes the `"cyber"` category and the `"allow"` behavior. The API accepts `"allow"` only with `"cyber"`, and `"decline"` only with `"nsfw"`, `"violence"`, and `"profanity"`, and rejects other pairs with `400`. `"cyber"` must be enabled for the API key, and the API answers `403` when it isn't.
+- `incomplete_details.reason` can be `"content_filter"`.
+
+### Changed
+
+- Updated the API types to the current OpenAPI spec. The spec also adds an `ImageBackground` schema that no endpoint uses yet, so it changes no request or response type.
+
 ## [0.2.6] - 2026-10-28
 
 ### Changed

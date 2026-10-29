@@ -14,8 +14,8 @@ import type {
   VideoInput,
 } from "./types.js";
 
-/** The formats the API reads from an audio file's name. `audio_format` takes all of them but `webm`. */
-export type AudioFileFormat = NonNullable<TranscriptionParams["audio_format"]> | "webm";
+/** The formats the API reads from an audio file's name. `audio_format` takes the same values. */
+export type AudioFileFormat = NonNullable<TranscriptionParams["audio_format"]>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -140,12 +140,14 @@ function sniffAudioFormat(bytes: Uint8Array): AudioFileFormat | undefined {
   if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe6) === 0xe2) return "mp3";
   if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xf6) === 0xf0) return "aac";
   if (hasBytes(bytes, 0, ascii("RIFF")) && hasBytes(bytes, 8, ascii("WAVE"))) return "wav";
+  if (hasBytes(bytes, 0, ascii("RIFF")) && hasBytes(bytes, 8, ascii("AVI "))) return "avi";
   if (hasBytes(bytes, 0, ascii("fLaC"))) return "flac";
   if (hasBytes(bytes, 0, ascii("OggS"))) {
     // The first packet, which names the codec, follows the page's 27-byte header and segment table.
     return hasBytes(bytes, 27 + (bytes[26] ?? 0), ascii("OpusHead")) ? "opus" : "ogg";
   }
   if (hasBytes(bytes, 4, ascii("ftyp"))) {
+    if (hasBytes(bytes, 8, ascii("qt  "))) return "mov";
     return hasBytes(bytes, 8, ascii("M4A ")) || hasBytes(bytes, 8, ascii("M4B ")) ? "m4a" : "mp4";
   }
   if (hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3])) {

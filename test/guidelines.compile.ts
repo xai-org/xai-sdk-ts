@@ -7,8 +7,8 @@ type Equals<A, B> =
 type Guideline = NonNullable<CreateParams["guidelines"]>[number];
 
 export type GuidelinesAreOptional = Assert<IsOptional<CreateParams, "guidelines">>;
-export type GuidelineCategories = Assert<Equals<Guideline["category"], "nsfw" | "violence" | "profanity">>;
-export type GuidelineBehaviors = Assert<Equals<Guideline["behavior"], "decline">>;
+export type GuidelineCategories = Assert<Equals<Guideline["category"], "nsfw" | "violence" | "profanity" | "cyber">>;
+export type GuidelineBehaviors = Assert<Equals<Guideline["behavior"], "decline" | "allow">>;
 
 export const guidelinesExample = {
   model: "grok-released-after-this-sdk",
@@ -17,6 +17,7 @@ export const guidelinesExample = {
     { type: "policy", category: "nsfw", behavior: "decline" },
     { type: "policy", category: "violence", behavior: "decline" },
     { type: "policy", category: "profanity", behavior: "decline" },
+    { type: "policy", category: "cyber", behavior: "allow" },
   ],
 } satisfies CreateParams;
 
@@ -26,5 +27,5 @@ export const sexualCategory: Guideline = { type: "policy", category: "sexual", b
 export const selfHarmCategory: Guideline = { type: "policy", category: "self_harm", behavior: "decline" };
 // @ts-expect-error The API no longer accepts `illicit`.
 export const illicitCategory: Guideline = { type: "policy", category: "illicit", behavior: "decline" };
-// @ts-expect-error `decline` is the only behavior.
+// @ts-expect-error The API no longer accepts `offer_support`.
 export const offerSupportBehavior: Guideline = { type: "policy", category: "violence", behavior: "offer_support" };

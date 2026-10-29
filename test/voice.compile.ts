@@ -37,6 +37,12 @@ export type TimestampsReturnJson = Assert<
 export type SpeechLanguageIsRequired = Assert<
   IsOptional<SpeechParams, "language"> extends false ? true : false
 >;
+export type TranscriptionAudioFormats = Assert<
+  Equals<
+    NonNullable<TranscriptionParams["audio_format"]>,
+    "pcm" | "mulaw" | "alaw" | "wav" | "mp3" | "ogg" | "opus" | "flac" | "aac" | "mp4" | "m4a" | "mkv" | "webm" | "avi" | "mov"
+  >
+>;
 export type CustomVoiceFileIsRequired = Assert<
   IsOptional<CustomVoiceCreateParams, "file"> extends false ? true : false
 >;

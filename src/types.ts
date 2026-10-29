@@ -378,7 +378,10 @@ export type TranscriptionParams = {
     | "aac"
     | "mp4"
     | "m4a"
-    | "mkv";
+    | "mkv"
+    | "webm"
+    | "avi"
+    | "mov";
   sample_rate?: 8000 | 16000 | 22050 | 24000 | 44100 | 48000;
   language?: string;
   /** Write spoken numbers, currencies, and units in written form. Requires `language`. */
