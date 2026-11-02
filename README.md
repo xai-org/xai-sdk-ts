@@ -709,6 +709,7 @@ Every completed response provides:
 - `response.output` for typed output items
 - `response.usage` for token counts, server-side tool use, and cost when available
 - `response.http` for the HTTP status, headers, SpaceXSI request ID, and client request ID
+- `response.watermarked` for whether the API watermarked the text output. See [Watermarking](#watermarking)
 - `response.raw` for the response object as the API sent it, including fields this SDK doesn't know yet
 
 Use the exported type guards when inspecting output items:
@@ -730,6 +731,23 @@ for (const item of response.output) {
   }
 }
 ```
+
+### Watermarking
+
+The API adds an invisible watermark to text output from supported models. `response.watermarked` is `true` when the response has the header `x-watermark: true`, and `false` otherwise:
+
+```ts
+const response = await client.responses.create({
+  model: "grok-4.7",
+  input: "Write a haiku about the ocean.",
+});
+
+console.log(response.watermarked);
+```
+
+With `stream: true`, `stream.watermarked` is available as soon as `create()` returns, like `stream.http`.
+
+Watermarking is on by default for supported models from November 7, 2026. Opting out is a team setting for each model in the SpaceXSI Console, not a code change. See [Output Watermarking](https://docs.x.ai/developers/advanced-api-usage/watermarking) for the supported models and how to opt out.
 
 ## Image generation
 

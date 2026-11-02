@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+
+- `response.watermarked` and `stream.watermarked` tell you whether the API watermarked the text output of `responses.create()`. Each is `true` when the response has the header `x-watermark: true`, and `false` when the header is missing or has any other value. `stream.watermarked` is available as soon as `create()` returns, and with `retryBeforeOutput`, both use the headers of the attempt that produced the response. Watermarking is on by default for supported models from November 7, 2026.
+
 ## [0.2.7] - 2026-10-29
 
 ### Added
