@@ -41,6 +41,10 @@ function validateJson<Output>(schema: StandardSchema<Output>, value: unknown): O
   return result.value;
 }
 
+export function isWatermarked(http: HttpMeta): boolean {
+  return http.headers.get("x-watermark")?.trim().toLowerCase() === "true";
+}
+
 function copyWireFields(target: ModelResponse, wire: Record<string, unknown>): void {
   const proto = Object.getPrototypeOf(target) as object;
   for (const [key, value] of Object.entries(wire)) {
@@ -89,6 +93,11 @@ export class ModelResponse {
     this.http = http;
     this.raw = wire;
     copyWireFields(this, wire);
+  }
+
+  /** True when `http.headers` has `x-watermark: true`, which means the API watermarked the text output. */
+  get watermarked(): boolean {
+    return isWatermarked(this.http);
   }
 
   get parsed(): unknown | null {

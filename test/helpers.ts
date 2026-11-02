@@ -92,7 +92,7 @@ export function sseResponse(
   });
 }
 
-export function erroringSse(beforeByte: boolean): Response {
+export function erroringSse(beforeByte: boolean, headers: Record<string, string> = {}): Response {
   const encoder = new TextEncoder();
   let sent = false;
   const stream = new ReadableStream<Uint8Array>({
@@ -111,7 +111,7 @@ export function erroringSse(beforeByte: boolean): Response {
   });
   return new Response(stream, {
     status: 200,
-    headers: { "content-type": "text/event-stream", "x-request-id": "req_test" },
+    headers: { "content-type": "text/event-stream", "x-request-id": "req_test", ...headers },
   });
 }
 

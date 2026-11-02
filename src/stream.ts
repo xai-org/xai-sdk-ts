@@ -18,7 +18,7 @@ import {
 import { parsePartialJson } from "./partial-json.js";
 import { parseSse } from "./sse.js";
 import { isImageGenerationCall, isMessage } from "./porcelain.js";
-import { ModelResponse } from "./response.js";
+import { ModelResponse, isWatermarked } from "./response.js";
 import type {
   ClientToolCall,
   HttpMeta,
@@ -141,6 +141,11 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
   /** HTTP metadata of the request whose stream is being read, which changes if `retryBeforeOutput` sends it again. */
   get http(): HttpMeta {
     return this.#http;
+  }
+
+  /** True when `http.headers` has `x-watermark: true`, which means the API watermarked the text output. */
+  get watermarked(): boolean {
+    return isWatermarked(this.#http);
   }
 
   /**
