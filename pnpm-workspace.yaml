@@ -56,8 +56,12 @@ minimumReleaseAgeExclude:
 # js-yaml <4.3.2 is affected by GHSA-2883-xcg3-v3hh. It is only reached through
 # openapi-typescript > @redocly/openapi-core, which still declares ^4.1.0.
 # Drop this once @redocly/openapi-core requires a patched release itself.
+# minimatch <11.0.1 has a moderate ReDoS advisory. It is only reached through
+# openapi-typescript > @redocly/openapi-core. Drop this once that package
+# requires a patched release itself.
 overrides:
   'js-yaml@<4.3.2': '4.3.2'
+  'minimatch@<11.0.1': '11.0.1'
 
 trustPolicy: no-downgrade
 # This integrity-locked legacy release predates stronger publisher metadata.
