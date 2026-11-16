@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the retired `grok-imagine-image-quality` id from `KnownImageModelId`. The public models catalog no longer lists it after its November 2, 2026 retirement. Regenerated `src/models.ts` from https://docs.x.ai/developers/models.md. `ImageModelId` still accepts any string, so this is a TypeScript-only change: existing calls type-check and run as before. Use `grok-imagine-image-2.0` for new work.
+
 ### Fixed
 
 - Streaming over SSE keeps the fields of one event together when the server ends lines with `\r\n`. A single `\r\n` was read as a blank line, so `event:` was split from its `data:` (the event name was dropped from `type`) and a `data:` value spread over several lines was parsed line by line as unknown events. Bare `\r` and `\n` line endings are unchanged.
