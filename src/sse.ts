@@ -1,8 +1,12 @@
 import { DEFAULT_MAX_RESPONSE_BODY_BYTES } from "./constants.js";
 
 const SSE_DONE = "[DONE]";
-/** A blank line ends an event, so a delimiter is at most four characters, as in `\r\n\r\n`. */
-const EVENT_DELIMITER = /(?:\r\n|\r|\n)(?:\r\n|\r|\n)/;
+/**
+ * A blank line ends an event, so a delimiter is at most four characters, as in `\r\n\r\n`.
+ * A bare `\r` counts as a line break only when no `\n` follows it; otherwise the pattern could
+ * read the single line break `\r\n` as `\r` then `\n` and split one event's fields apart.
+ */
+const EVENT_DELIMITER = /(?:\r\n|\n|\r(?!\n))(?:\r\n|\n|\r(?!\n))/;
 
 type ParseSseOptions = {
   onBytes?: () => void;

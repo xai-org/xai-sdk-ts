@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Fixed
+
+- Streaming over SSE keeps the fields of one event together when the server ends lines with `\r\n`. A single `\r\n` was read as a blank line, so `event:` was split from its `data:` (the event name was dropped from `type`) and a `data:` value spread over several lines was parsed line by line as unknown events. Bare `\r` and `\n` line endings are unchanged.
+
 ## [0.2.8] - 2026-11-03
 
 ### Added
