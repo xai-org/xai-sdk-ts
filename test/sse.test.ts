@@ -49,6 +49,41 @@ describe("parseSse", () => {
     ]);
   });
 
+  it("keeps CRLF fields of one event together", async () => {
+    const events = await collect(
+      streamFrom([
+        "event: response.created\r\ndata: {\"response\":{\"id\":\"r1\"}}\r\n\r\n",
+        "id: 7\r\nevent: response.output_text.delta\r\ndata: {\"delta\":\"hi\"}\r\n\r\n",
+        "data: {\"type\":\"response.completed\",\r\ndata: \"response\":{\"id\":\"r1\"}}\r\n\r\n",
+      ]),
+    );
+    expect(events).toEqual([
+      { type: "response.created", response: { id: "r1" } },
+      { type: "response.output_text.delta", delta: "hi" },
+      { type: "response.completed", response: { id: "r1" } },
+    ]);
+  });
+
+  it("keeps CRLF fields together when the chunks split a CRLF", async () => {
+    const text =
+      "event: response.output_text.delta\r\ndata: {\"delta\":\"a\"}\r\n\r\n" +
+      "data: {\"type\":\"ping\"}\r\n\r\n";
+    for (const size of [1, 2, 3, 5, 7]) {
+      const events = await collect(streamFrom(chunked(text, size)));
+      expect(events, `chunk size ${size}`).toEqual([
+        { type: "response.output_text.delta", delta: "a" },
+        { type: "ping" },
+      ]);
+    }
+  });
+
+  it("treats CR followed by CRLF and LF followed by CRLF as a blank line", async () => {
+    const events = await collect(
+      streamFrom(['data: {"type":"ping"}\r\r\ndata: {"type":"ping","n":2}\n\r\n']),
+    );
+    expect(events).toEqual([{ type: "ping" }, { type: "ping", n: 2 }]);
+  });
+
   it("emits a final event without a trailing blank line", async () => {
     const events = await collect(
       streamFrom(['data: {"type":"response.completed","response":{"id":"eof"}}\n']),
