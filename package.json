@@ -1,6 +1,6 @@
 {
   "name": "@xai-official/sdk",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "The official TypeScript SDK for the SpaceXSI API",
   "keywords": [
     "xai",

@@ -4,6 +4,8 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-11-17
+
 ### Changed
 
 - Removed the retired `grok-imagine-image-quality` id from `KnownImageModelId`. The public models catalog no longer lists it after its November 2, 2026 retirement. Regenerated `src/models.ts` from https://docs.x.ai/developers/models.md. `ImageModelId` still accepts any string, so this is a TypeScript-only change: existing calls type-check and run as before. Use `grok-imagine-image-2.0` for new work.
