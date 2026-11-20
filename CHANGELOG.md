@@ -4,6 +4,8 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-11-20
+
 ### Added
 
 - Each release is also published to npm as `@grok/sdk`, with the same build and version as `@xai-official/sdk`. `@xai-official/sdk` is still published as before. Install either name, and import from the name you installed.
