@@ -2,6 +2,7 @@ node_modules
 .pnpm-store
 dist
 artifacts
+artifacts-mirror
 coverage
 *.tsbuildinfo
 .DS_Store

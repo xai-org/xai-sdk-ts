@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { MIRROR_PACKAGE_NAME, renameTarball } from "./rename-artifact.mjs";
 
 const ROOT = path.join(fileURLToPath(new URL("..", import.meta.url)));
 const TEMP = await mkdtemp(path.join(os.tmpdir(), "xai-sdk-package-"));
@@ -36,57 +37,33 @@ function runNpm(args, options = {}) {
   return run(process.platform === "win32" ? "npm.cmd" : "npm", args, options);
 }
 
-try {
-  const packed = JSON.parse(
-    runNpm(["pack", "--json", "--pack-destination", TEMP], { capture: true }),
-  );
-  assert(Array.isArray(packed) && packed.length === 1, "npm pack returned an unexpected report");
-
-  const report = packed[0];
-  const paths = report.files.map((file) => file.path);
-  for (const file of paths) {
-    assert(
-      file === "package.json" ||
-        file === "README.md" ||
-        file === "CHANGELOG.md" ||
-        file === "LICENSE" ||
-        file === "NOTICE" ||
-        file.startsWith("dist/"),
-      `unexpected file in tarball: ${file}`,
-    );
-    assert(!file.endsWith(".map"), `source map should not ship: ${file}`);
-  }
-  assert(paths.includes("CHANGELOG.md"), "tarball is missing CHANGELOG.md, which README.md links to");
-  assert(paths.includes("dist/index.js"), "tarball is missing dist/index.js");
-  assert(paths.includes("dist/index.d.ts"), "tarball is missing dist/index.d.ts");
-  assert(paths.includes("dist/tools.js"), "tarball is missing dist/tools.js");
-  assert(paths.includes("dist/tools.d.ts"), "tarball is missing dist/tools.d.ts");
-
+async function smoke(tarball, name, dir) {
+  await mkdir(dir, { recursive: true });
   await writeFile(
-    path.join(TEMP, "package.json"),
+    path.join(dir, "package.json"),
     JSON.stringify({ private: true, type: "module" }),
   );
-  await writeFile(path.join(TEMP, "esm.mjs"), `
-    import { SDK_USER_AGENT, SDK_VERSION, SpaceXAI, SpaceXSI } from "@xai-official/sdk";
+  await writeFile(path.join(dir, "esm.mjs"), `
+    import { SDK_USER_AGENT, SDK_VERSION, SpaceXAI, SpaceXSI } from "${name}";
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad ESM version");
     if (SDK_USER_AGENT !== \`xai-sdk/\${SDK_VERSION} (typescript)\`) throw new Error("bad ESM user agent");
     if (typeof SpaceXSI !== "function") throw new Error("missing ESM client");
     if (SpaceXAI !== SpaceXSI) throw new Error("missing ESM SpaceXAI alias");
     if (typeof new SpaceXSI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing ESM images");
-    const { xSearch } = await import("@xai-official/sdk/tools");
+    const { xSearch } = await import("${name}/tools");
     if (xSearch().type !== "x_search") throw new Error("missing ESM tool helpers");
   `);
-  await writeFile(path.join(TEMP, "cjs.cjs"), `
-    const { SDK_USER_AGENT, SDK_VERSION, SpaceXAI, SpaceXSI } = require("@xai-official/sdk");
+  await writeFile(path.join(dir, "cjs.cjs"), `
+    const { SDK_USER_AGENT, SDK_VERSION, SpaceXAI, SpaceXSI } = require("${name}");
     if (SDK_VERSION !== ${JSON.stringify(PACKAGE.version)}) throw new Error("bad CJS version");
     if (SDK_USER_AGENT !== \`xai-sdk/\${SDK_VERSION} (typescript)\`) throw new Error("bad CJS user agent");
     if (typeof SpaceXSI !== "function") throw new Error("missing CJS client");
     if (SpaceXAI !== SpaceXSI) throw new Error("missing CJS SpaceXAI alias");
     if (typeof new SpaceXSI({ apiKey: "test" }).images.generate !== "function") throw new Error("missing CJS images");
-    const { xSearch } = require("@xai-official/sdk/tools");
+    const { xSearch } = require("${name}/tools");
     if (xSearch().type !== "x_search") throw new Error("missing CJS tool helpers");
   `);
-  await writeFile(path.join(TEMP, "consumer.ts"), `
+  await writeFile(path.join(dir, "consumer.ts"), `
     import {
       SpaceXAI,
       SpaceXSI,
@@ -102,8 +79,8 @@ try {
       type ModelId,
       type OutputItem,
       type Tool,
-    } from "@xai-official/sdk";
-    import { xSearch } from "@xai-official/sdk/tools";
+    } from "${name}";
+    import { xSearch } from "${name}/tools";
     const xSearchTool: Tool = xSearch({ allowed_x_handles: ["xai"] });
     // @ts-expect-error Tool helper options are checked.
     void xSearch({ allowed_x_handle: ["xai"] });
@@ -146,7 +123,7 @@ try {
     void [imageModel, generate, edit, imageResponse, imageTool, imageCalls];
   `);
   await writeFile(
-    path.join(TEMP, "tsconfig.json"),
+    path.join(dir, "tsconfig.json"),
     JSON.stringify({
       compilerOptions: {
         target: "ES2022",
@@ -161,7 +138,7 @@ try {
     }),
   );
   await writeFile(
-    path.join(TEMP, "tsconfig.node.json"),
+    path.join(dir, "tsconfig.node.json"),
     JSON.stringify({
       compilerOptions: {
         target: "ES2024",
@@ -178,7 +155,6 @@ try {
     }),
   );
 
-  const tarball = path.join(TEMP, report.filename);
   runNpm(
     [
       "install",
@@ -188,24 +164,59 @@ try {
       "--no-fund",
       tarball,
     ],
-    { cwd: TEMP },
+    { cwd: dir },
   );
-  runNode(["esm.mjs"], { cwd: TEMP });
-  runNode(["cjs.cjs"], { cwd: TEMP });
+  runNode(["esm.mjs"], { cwd: dir });
+  runNode(["cjs.cjs"], { cwd: dir });
   runNode(
     [path.join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", "tsconfig.json"],
-    { cwd: TEMP },
+    { cwd: dir },
   );
   runNode(
     [path.join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", "tsconfig.node.json"],
-    { cwd: TEMP },
+    { cwd: dir },
   );
 
   const installed = JSON.parse(
-    await readFile(path.join(TEMP, "node_modules", "@xai-official", "sdk", "package.json"), "utf8"),
+    await readFile(path.join(dir, "node_modules", ...name.split("/"), "package.json"), "utf8"),
   );
-  assert.equal(installed.version, report.version);
-  console.log(`Package smoke passed: ${report.filename} (${paths.length} files)`);
+  assert.equal(installed.name, name);
+  assert.equal(installed.version, PACKAGE.version);
+}
+
+try {
+  const packed = JSON.parse(
+    runNpm(["pack", "--json", "--pack-destination", TEMP], { capture: true }),
+  );
+  assert(Array.isArray(packed) && packed.length === 1, "npm pack returned an unexpected report");
+
+  const report = packed[0];
+  const paths = report.files.map((file) => file.path);
+  for (const file of paths) {
+    assert(
+      file === "package.json" ||
+        file === "README.md" ||
+        file === "CHANGELOG.md" ||
+        file === "LICENSE" ||
+        file === "NOTICE" ||
+        file.startsWith("dist/"),
+      `unexpected file in tarball: ${file}`,
+    );
+    assert(!file.endsWith(".map"), `source map should not ship: ${file}`);
+  }
+  assert(paths.includes("CHANGELOG.md"), "tarball is missing CHANGELOG.md, which README.md links to");
+  assert(paths.includes("dist/index.js"), "tarball is missing dist/index.js");
+  assert(paths.includes("dist/index.d.ts"), "tarball is missing dist/index.d.ts");
+  assert(paths.includes("dist/tools.js"), "tarball is missing dist/tools.js");
+  assert(paths.includes("dist/tools.d.ts"), "tarball is missing dist/tools.d.ts");
+
+  const tarball = path.join(TEMP, report.filename);
+  await smoke(tarball, PACKAGE.name, path.join(TEMP, "primary"));
+
+  // Every release also publishes this build as MIRROR_PACKAGE_NAME (see release.yml).
+  const mirror = await renameTarball(tarball, MIRROR_PACKAGE_NAME, path.join(TEMP, "mirror-pack"));
+  await smoke(mirror.path, MIRROR_PACKAGE_NAME, path.join(TEMP, "mirror"));
+  console.log(`Package smoke passed: ${report.filename} and ${mirror.filename} (${paths.length} files)`);
 } finally {
   await rm(TEMP, { recursive: true, force: true });
 }

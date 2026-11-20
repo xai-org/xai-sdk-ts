@@ -29,7 +29,7 @@ export function assertNodeVersion(): void {
   const major = Number.parseInt(majorRaw ?? "0", 10);
   const minor = Number.parseInt(minorRaw ?? "0", 10);
   if (major < 22 || (major === 22 && minor < 13)) {
-    throw new Error(`@xai-official/sdk requires Node.js 22.13 or later (found ${raw})`);
+    throw new Error(`The SpaceXSI SDK requires Node.js 22.13 or later (found ${raw})`);
   }
 }
 
