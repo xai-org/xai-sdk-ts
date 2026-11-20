@@ -41,6 +41,14 @@ npm install @xai-official/sdk
 pnpm add @xai-official/sdk
 ```
 
+Every release is also published as `@grok/sdk`. It is the same build with the same version, so you can install either name:
+
+```bash
+npm install @grok/sdk
+```
+
+If you install `@grok/sdk`, import from `@grok/sdk` and `@grok/sdk/tools` wherever the examples below use `@xai-official/sdk`.
+
 ## Quickstart
 
 Set your API key in the environment. The client reads `XAI_API_KEY` automatically.
