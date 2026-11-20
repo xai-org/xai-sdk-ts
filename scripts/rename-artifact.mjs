@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Repacks a built npm tarball under another package name.
+ * Repacks a built npm tarball under another package name with tar.
  *
  * Usage: node scripts/rename-artifact.mjs <tarball> <out-dir> [name]
  *
@@ -23,8 +23,8 @@ import { fileURLToPath } from "node:url";
 /** Second npm name for every release. The build is the same as the main package. */
 export const MIRROR_PACKAGE_NAME = "@grok/sdk";
 
-function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8" });
+function run(command, args, cwd, env = process.env) {
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", env });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     process.stderr.write(result.stdout ?? "");
@@ -66,14 +66,14 @@ export async function renameTarball(tarball, name, outDir) {
     manifest.name = name;
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
+    // tar instead of npm pack: npm 10 runs the "prepare" script when packing a
+    // directory, even with --ignore-scripts, and the tarball has no scripts/.
     await mkdir(out, { recursive: true });
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    const report = JSON.parse(
-      run(npm, ["pack", "--json", "--ignore-scripts", "--pack-destination", out], work),
-    );
-    assert(Array.isArray(report) && report.length === 1, "npm pack returned an unexpected report");
-    const filename = report[0].filename;
+    const filename = `${name.slice(1).replace("/", "-")}-${manifest.version}.tgz`;
     const renamed = path.join(out, filename);
+    await rm(renamed, { force: true });
+    const tarEnv = { ...process.env, COPYFILE_DISABLE: "1" };
+    run("tar", ["-czf", renamed, "-C", path.dirname(work), "package"], temp, tarEnv);
 
     const repacked = await extract(renamed, path.join(temp, "repacked"));
     const before = await listFiles(original);
