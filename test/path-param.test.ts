@@ -3,11 +3,33 @@ import { pathParam } from "../src/http.js";
 import { SpaceXSI } from "../src/index.js";
 import { mockFetch, jsonResponse } from "./helpers.js";
 
+// What code without type checking can pass as an id, with the type that the error message names.
+const NOT_STRING_OR_NUMBER: Array<[string, object | boolean | null | undefined, string]> = [
+  ['[".."]', [".."], "array"],
+  ["[]", [], "array"],
+  ['new String("..")', new String(".."), "object"],
+  ['{ toString: () => ".." }', { toString: () => ".." }, "object"],
+  ["null", null, "null"],
+  ["undefined", undefined, "undefined"],
+  ["true", true, "boolean"],
+];
+
 describe("pathParam", () => {
   it("rejects values that do not address their own segment", () => {
     for (const bad of ["", ".", ".."]) {
       expect(() => pathParam(bad)).toThrow(TypeError);
+      expect(() => pathParam(bad)).toThrow(`Invalid path parameter: ${JSON.stringify(bad)}`);
     }
+  });
+
+  it.each(NOT_STRING_OR_NUMBER)("rejects %s, which is not a string or number", (_label, bad, type) => {
+    const encode = () => pathParam(bad as unknown as string);
+    expect(encode).toThrow(TypeError);
+    expect(encode).toThrow(`Invalid path parameter: expected a string or number, got ${type}`);
+  });
+
+  it("encodes a number as its string", () => {
+    expect(pathParam(42 as unknown as string)).toBe("42");
   });
 
   it("percent-encodes an ordinary id", () => {
@@ -51,7 +73,20 @@ describe("resource methods reject ids that would retarget the request", () => {
       const { fetch, captured } = mockFetch(() => jsonResponse({}));
       const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
       for (const bad of ["", ".", ".."]) {
-        await expect(Promise.resolve().then(() => call(client, bad))).rejects.toThrow(TypeError);
+        const pending = Promise.resolve().then(() => call(client, bad));
+        await expect(pending).rejects.toThrow(TypeError);
+        await expect(pending).rejects.toThrow(`Invalid path parameter: ${JSON.stringify(bad)}`);
+      }
+      expect(captured.requests).toHaveLength(0);
+    });
+
+    it(`${name} throws a TypeError for an id that is not a string or number without sending a request`, async () => {
+      const { fetch, captured } = mockFetch(() => jsonResponse({}));
+      const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+      for (const [, bad, type] of NOT_STRING_OR_NUMBER) {
+        const pending = Promise.resolve().then(() => call(client, bad as unknown as string));
+        await expect(pending).rejects.toThrow(TypeError);
+        await expect(pending).rejects.toThrow(`Invalid path parameter: expected a string or number, got ${type}`);
       }
       expect(captured.requests).toHaveLength(0);
     });
