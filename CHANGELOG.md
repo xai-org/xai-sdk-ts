@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the retired `grok-build-0.1` id from `KnownModelId`. It reached end of life on November 19, 2026, and the public models catalog no longer lists it. Regenerated `src/models.ts` from https://docs.x.ai/developers/models.md. `ModelId` still accepts any string, so this is a TypeScript-only change and existing code still type-checks. The API no longer serves this model, so requests that name it will fail at runtime either way.
+
 ### Fixed
 
 - The per-request timeout and idle timers no longer keep a Node.js process alive on their own. A request that failed before it was sent (for example, a `baseURL` without a scheme) or a binary response from `files.content()` or `voice.speak()` whose body was never read kept the process running until the timeout fired, which is one hour by default.
