@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Changed
+
+- Removed the retired `grok-build-0.1` id from `KnownModelId`. It reached end of life on November 19, 2026, and the public models catalog no longer lists it. Regenerated `src/models.ts` from https://docs.x.ai/developers/models.md. `ModelId` still accepts any string, so this is a TypeScript-only change and existing code still type-checks. The API no longer serves this model, so requests that name it will fail at runtime either way.
+
 ### Fixed
 
 - Resource methods that take an id (`files`, `batches`, `models`, `responses`, `videos` and `voice`) throw a `TypeError` for an empty id, `"."` or `".."` instead of sending the request. The URL parser resolved these as dot segments, so a call like `files.delete("..")` was sent as `DELETE /v1/` and `files.get("")` went to `/v1/files/`. Other ids are encoded as before.
