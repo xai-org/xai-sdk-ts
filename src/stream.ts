@@ -95,6 +95,10 @@ function isLifecycleEvent(event: ResponseStreamEvent): boolean {
   return event.type === "ping" || event.type === "response.created" || event.type === "response.in_progress";
 }
 
+function isTerminalEvent(event: ResponseStreamEvent): boolean {
+  return event.type === "response.completed" || event.type === "response.failed" || event.type === "response.incomplete";
+}
+
 function isRetryableBeforeOutput(error: APIError): boolean {
   if (error instanceof APIConnectionError) return true;
   return error.status !== undefined && (RETRYABLE_STATUS.has(error.status) || SERVER_ERROR_RETRY_STATUS.has(error.status));
@@ -292,6 +296,11 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
         });
       }
     } catch (err) {
+      // A transport or timeout failure after the terminal response has been applied must not
+      // discard it: the response is complete (and billed), so done() and create() resolve to it.
+      if (this.#final && !this.#error) {
+        return;
+      }
       const mapped = withClientRequestId(
         this.#signal?.aborted
           ? errorFromUnknown(this.#signal.reason ?? err, this.#requestId)
@@ -343,6 +352,9 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
         }
         this.#apply(event);
         yield event;
+        // The terminal event carries the whole response. Stop here instead of waiting for EOF, so a
+        // server that holds the socket open, or a reset before EOF, can't fail a completed response.
+        if (isTerminalEvent(event)) return undefined;
       }
     } catch (err) {
       const error = errorFromUnknown(err, this.#requestId);

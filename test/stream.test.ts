@@ -538,3 +538,72 @@ describe("stream.on and stream.done", () => {
     await stream.close();
   });
 });
+
+describe("completed response survives a late transport error", () => {
+  function completedThenError(): Response {
+    const encoder = new TextEncoder();
+    let step = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (step++ === 0) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "response.completed", response: completedResponse })}\n\n`),
+          );
+          return;
+        }
+        // Connection reset after the terminal event, before EOF / [DONE].
+        controller.error(new TypeError("terminated: other side closed"));
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "content-type": "text/event-stream", "x-request-id": "req_test" },
+    });
+  }
+
+  it("create() resolves to the completed response despite a reset before EOF", async () => {
+    const { fetch } = mockFetch(() => completedThenError());
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const response = await client.responses.create({ ...createBody });
+    expect(response.status).toBe("completed");
+    expect(response.id).toBe("resp_123");
+  });
+
+  it("stream done() resolves to the completed response despite a reset before EOF", async () => {
+    const { fetch } = mockFetch(() => completedThenError());
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const stream = await client.responses.create({ ...createBody, stream: true });
+    for await (const _ of stream) {
+      // drain
+    }
+    const response = await stream.done();
+    expect(response.status).toBe("completed");
+  });
+
+  it("stops reading and cancels the body after the terminal event when the server holds it open", async () => {
+    const encoder = new TextEncoder();
+    let cancelled = false;
+    const { fetch } = mockFetch(
+      () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: "response.completed", response: completedResponse })}\n\n`),
+              );
+              // never closes
+            },
+            cancel() {
+              cancelled = true;
+            },
+          }),
+          { status: 200, headers: { "content-type": "text/event-stream", "x-request-id": "req_test" } },
+        ),
+    );
+    // The request timeout is far longer than the test timeout, so this only passes if the stream stops on its own.
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0, timeout: 600_000 });
+    const response = await client.responses.create({ ...createBody });
+    expect(response.status).toBe("completed");
+    expect(cancelled).toBe(true);
+  });
+});

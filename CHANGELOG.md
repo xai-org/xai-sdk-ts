@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Fixed
+
+- A streamed response stops reading once its terminal event (`response.completed`, `response.failed` or `response.incomplete`) arrives, and cancels the body. Before, a connection reset or a client timeout after that event made `stream.done()` and a non-streaming `responses.create()` reject and drop the response that had already completed.
+
 ## [0.2.10] - 2026-11-20
 
 ### Added
