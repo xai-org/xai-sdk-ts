@@ -117,6 +117,7 @@ export type {
   ToolCall,
   Transcription,
   TranscriptionParams,
+  TranscriptionRedaction,
   UrlCitation,
   VideoEditParams,
   VideoExtendParams,

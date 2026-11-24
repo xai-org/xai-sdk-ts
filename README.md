@@ -1094,6 +1094,21 @@ console.log(transcript.text);
 
 With `diarize: true`, each word also has a `speaker`, and the API takes the audio format from the file name. A `File` sends its own name. The SDK names a `Blob` after its MIME type, such as `audio.mp3` for `audio/mpeg`, and a `Blob` without one, such as one from `openAsBlob()`, after the format its first bytes show: MP3, AAC, WAV, FLAC, Ogg, Opus, M4A, MP4, Matroska, WebM, AVI, or MOV. For a file in another format, give the `Blob` a `type` when you create it.
 
+To replace sensitive values with tags such as `[NAME_1]`, pass `redact` with one or more groups (`pii`, `pci`, `phi`) or single types such as `ssn`. Set `show_redacted_text: true` to get the original words back on each redacted word as `redacted_text`:
+
+```ts
+const redacted = await client.voice.transcribe({
+  file: await openAsBlob("./call.mp3"),
+  language: "en",
+  redact: ["pii", "pci"],
+  show_redacted_text: true,
+});
+
+console.log(redacted.text); // "My card number is [CREDIT_CARD_1]."
+```
+
+`pii` does not cover card or bank details, so add `pci`, `bank_account`, and `routing_number` for those. If redaction cannot run, the request fails with a 503 rather than returning an unredacted transcript. Redaction is billed per hour of audio on top of transcription. The streaming endpoint at `wss://api.x.ai/v1/stt` takes the same `redact` query parameters and sends no interim results while it is set.
+
 Clone a voice from a reference clip of up to 120 seconds with `client.voice.custom.create()`. Creating custom voices through the API requires an Enterprise plan:
 
 ```ts
