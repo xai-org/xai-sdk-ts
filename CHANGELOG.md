@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Fixed
+
+- The per-request timeout and idle timers no longer keep a Node.js process alive on their own. A request that failed before it was sent (for example, a `baseURL` without a scheme) or a binary response from `files.content()` or `voice.speak()` whose body was never read kept the process running until the timeout fired, which is one hour by default.
+
 ## [0.2.10] - 2026-11-20
 
 ### Added
