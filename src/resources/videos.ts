@@ -1,4 +1,4 @@
-import { send, type SendResult } from "../http.js";
+import { send, type SendResult, pathParam } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { inlineMediaUrls, inlineVideoInput } from "../porcelain.js";
 import { mapMediaUsage } from "../usage.js";
@@ -78,7 +78,7 @@ export class Videos {
   async get(requestId: string, opts?: RequestOpts): Promise<VideoResponse> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/videos/${encodeURIComponent(requestId)}`,
+      path: `/videos/${pathParam(requestId)}`,
       opts,
     });
     // Pending requests answer 202, with or without a JSON body.

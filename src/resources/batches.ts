@@ -1,4 +1,4 @@
-import { send, type SendResult } from "../http.js";
+import { send, type SendResult, pathParam } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
@@ -94,7 +94,7 @@ export class Batches {
   async get(batchId: string, opts?: RequestOpts): Promise<Batch & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/batches/${encodeURIComponent(batchId)}`,
+      path: `/batches/${pathParam(batchId)}`,
       opts,
     });
     return toBatch(result);
@@ -103,7 +103,7 @@ export class Batches {
   async cancel(batchId: string, opts?: RequestOpts): Promise<Batch & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "POST",
-      path: `/batches/${encodeURIComponent(batchId)}:cancel`,
+      path: `/batches/${pathParam(batchId)}:cancel`,
       opts,
     });
     return toBatch(result);
@@ -119,7 +119,7 @@ export class Batches {
       async (pageQuery) => {
         const result = await send(this.client, {
           method: "GET",
-          path: `/batches/${encodeURIComponent(batchId)}/results`,
+          path: `/batches/${pathParam(batchId)}/results`,
           query: pageQuery,
           opts,
         });
@@ -170,7 +170,7 @@ export class BatchRequests {
     );
     const result = await send(this.client, {
       method: "POST",
-      path: `/batches/${encodeURIComponent(batchId)}/requests`,
+      path: `/batches/${pathParam(batchId)}/requests`,
       body: { ...body, batch_requests },
       opts,
     });
@@ -187,7 +187,7 @@ export class BatchRequests {
       async (pageQuery) => {
         const result = await send(this.client, {
           method: "GET",
-          path: `/batches/${encodeURIComponent(batchId)}/requests`,
+          path: `/batches/${pathParam(batchId)}/requests`,
           query: pageQuery,
           opts,
         });

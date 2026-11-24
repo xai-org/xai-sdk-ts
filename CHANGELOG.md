@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Fixed
+
+- Resource methods that take an id (`files`, `batches`, `models`, `responses`, `videos` and `voice`) throw a `TypeError` for an empty id, `"."` or `".."` instead of sending the request. The URL parser resolved these as dot segments, so a call like `files.delete("..")` was sent as `DELETE /v1/` and `files.get("")` went to `/v1/files/`. Other ids are encoded as before.
+
 ## [0.2.10] - 2026-11-20
 
 ### Added
