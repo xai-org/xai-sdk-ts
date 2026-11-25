@@ -15,6 +15,7 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 ### Fixed
 
 - Resource methods that take an id (`files`, `batches`, `models`, `responses`, `videos` and `voice`) throw a `TypeError` for an empty id, `"."` or `".."` instead of sending the request. The URL parser resolved these as dot segments, so a call like `files.delete("..")` was sent as `DELETE /v1/` and `files.get("")` went to `/v1/files/`. An id that isn't a string or number, such as `[".."]` or `undefined`, also throws a `TypeError` instead of being converted to a string. Other ids are encoded as before.
+- `responses.create()` without `stream`, and `stream.done()` on a streaming response, resolve with the completed response when the connection fails or is held open after the terminal event (`response.completed`, `response.failed`, or `response.incomplete`). They used to reject after a connection reset or a timeout in that window, and the caller lost a response that had already completed. The stream now ends at the terminal event: later events are not delivered, and an `error` event, an abort, or a timeout after the terminal event no longer rejects. The SDK reads the rest of the body for up to 250 milliseconds so the connection can be reused.
 
 ## [0.2.10] - 2026-11-20
 
