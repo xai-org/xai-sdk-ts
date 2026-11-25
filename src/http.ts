@@ -155,6 +155,14 @@ function limitMs(ms: number): number {
   return ms > 0 ? delayMs(ms) : MAX_TIMEOUT_MS;
 }
 
+/**
+ * Lets the process exit while `timer` is still armed. Does nothing where a timer has no `unref()`, as in browsers,
+ * or when the handle is missing.
+ */
+function unrefTimer(timer: ReturnType<typeof setTimeout> | null | undefined): void {
+  (timer as { unref?: () => void } | null | undefined)?.unref?.();
+}
+
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   const delay = delayMs(ms);
   if (delay === 0) return Promise.resolve();
@@ -234,9 +242,11 @@ export function withQuery(url: string, query?: Record<string, string | number | 
 function timeoutSignal(ms: number): { signal: AbortSignal; cleanup: () => void } {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new TimeoutError("Request timed out")), limitMs(ms));
-  // The timer must not keep the process alive on its own. A live request keeps the event loop
-  // running anyway, and a caller that never reads a binary body shouldn't hold the process open.
-  (timer as { unref?: () => void }).unref?.();
+  // The timer must not keep the process alive on its own, so a caller that never reads a body
+  // doesn't hold the process open. A live request keeps the event loop running through its
+  // connection, but a custom `fetch` or hook that leaves nothing else pending does not, and then
+  // the process can exit before the timeout fires.
+  unrefTimer(timer);
   return { signal: controller.signal, cleanup: () => clearTimeout(timer) };
 }
 
@@ -360,19 +370,18 @@ async function sendWithRetries(
   while (true) {
     const headers = buildHeaders(client, req.opts, accept, typeof body === "string", clientRequestId);
     const t = timeoutSignal(timeout);
-    const merged = mergeSignals([req.opts?.signal, t.signal]);
-    const signal = merged.signal;
+    let merged: ReturnType<typeof mergeSignals> | undefined;
     const cleanupAttempt = () => {
       t.cleanup();
-      merged.cleanup();
+      merged?.cleanup();
     };
-    if (signal?.aborted) {
-      cleanupAttempt();
-      throw errorFromAbort(signal, lastRequestId);
-    }
 
+    let signal: AbortSignal | undefined;
     let request: Request;
     try {
+      merged = mergeSignals([req.opts?.signal, t.signal]);
+      signal = merged.signal;
+      if (signal?.aborted) throw errorFromAbort(signal, lastRequestId);
       request = new Request(url, {
         method: req.method,
         headers,
@@ -384,8 +393,9 @@ async function sendWithRetries(
         console.error(formatCurl(req.method, url, headers, body));
       }
     } catch (err) {
-      // e.g. an invalid URL from a misconfigured baseURL. Clear the attempt's timer so the
-      // failure doesn't leave it armed until the timeout fires.
+      // e.g. a `signal` that isn't an AbortSignal or has already aborted, or an invalid URL from a
+      // misconfigured baseURL. Clear the attempt's timer so the failure doesn't leave it armed
+      // until the timeout fires.
       cleanupAttempt();
       throw err;
     }
@@ -631,7 +641,7 @@ async function readOnce(
       void reader.cancel().catch(() => {});
       finish(() => reject(new TimeoutError("Idle timeout", { requestId })));
     }, limitMs(idleTimeout));
-    (idle as { unref?: () => void }).unref?.();
+    unrefTimer(idle);
     reader.read().then(
       (value) => finish(() => resolve(value)),
       (err) => finish(() => reject(err)),

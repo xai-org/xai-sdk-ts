@@ -14,7 +14,7 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ### Fixed
 
-- The per-request timeout and idle timers no longer keep a Node.js process alive on their own. A request that failed before it was sent (for example, a `baseURL` without a scheme) or a binary response from `files.content()` or `voice.speak()` whose body was never read kept the process running until the timeout fired, which is one hour by default.
+- The request timeout and idle timers no longer keep a Node.js process alive on their own. A request that failed before it was sent (for example, a `baseURL` without a scheme), or a response whose body was never read (`files.content()`, `voice.speak()`, `voice.custom.getAudio()`, or a `stream: true` response), kept the process running until the timeout fired, which is one hour by default. A body that is still downloading keeps its connection open as it does with `fetch`, so cancel a body you won't read. With a custom `fetch` or hook that leaves nothing else pending, the process can now exit before the timeout fires.
 
 ## [0.2.10] - 2026-11-20
 
