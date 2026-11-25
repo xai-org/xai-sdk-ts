@@ -4,6 +4,10 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+
+- `voice.transcribe()` takes `redact` and `show_redacted_text`. `redact` is a list of groups (`"pii"`, `"pci"`, `"phi"`) or single types such as `"ssn"`, each sent as its own `redact` field, and the API replaces matching values in `text`, `words`, and `channels` with tags such as `[NAME_1]`. With `show_redacted_text: true`, each redacted word has the original words in `redacted_text`. Exported `TranscriptionRedaction` for the `redact` values.
+
 ### Changed
 
 - Removed the retired `grok-build-0.1` id from `KnownModelId`. It reached end of life on November 19, 2026, and the public models catalog no longer lists it. Regenerated `src/models.ts` from https://docs.x.ai/developers/models.md. `ModelId` still accepts any string, so this is a TypeScript-only change and existing code still type-checks. The API no longer serves this model, so requests that name it will fail at runtime either way.
