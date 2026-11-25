@@ -37,6 +37,28 @@ export function joinURL(base: string, path: string): string {
   return `${b}${p}`;
 }
 
+/**
+ * Encodes a value for use as a single URL path segment, rejecting values that would not address
+ * their own resource. `encodeURIComponent` leaves `.` and `..` unchanged and the URL parser then
+ * resolves them, and an empty id drops the segment, so e.g. `files.delete("..")` would hit
+ * `DELETE /v1/`. `%2E%2E` collapses too, so encoding alone cannot fix this.
+ *
+ * Untyped callers can pass any value, and `[".."]` is not `===` to `".."` but is encoded as `..`.
+ * So anything other than a string or number is rejected, and the check runs on `String(value)`,
+ * which is what gets encoded.
+ */
+export function pathParam(value: string): string {
+  if (typeof value !== "string" && typeof value !== "number") {
+    const got = value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+    throw new TypeError(`Invalid path parameter: expected a string or number, got ${got}`);
+  }
+  const segment = String(value);
+  if (segment === "" || segment === "." || segment === "..") {
+    throw new TypeError(`Invalid path parameter: ${JSON.stringify(segment)}`);
+  }
+  return encodeURIComponent(segment);
+}
+
 const REDACT_HEADERS = new Set([
   "authorization",
   "proxy-authorization",

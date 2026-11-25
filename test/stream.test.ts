@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APIError,
   APIProtocolError,
@@ -536,5 +536,177 @@ describe("stream.on and stream.done", () => {
     const stream = await streamOf(events);
     expect(() => stream.on("tool_calls" as "tool_call", () => {})).toThrow(TypeError);
     await stream.close();
+  });
+});
+
+describe("after the terminal event", () => {
+  const completed = { type: "response.completed", response: completedResponse };
+  const terminals = [
+    completed,
+    {
+      type: "response.failed",
+      response: { ...completedResponse, status: "failed", output: [], error: { code: "server_error", message: "boom" } },
+    },
+    {
+      type: "response.incomplete",
+      response: { ...completedResponse, status: "incomplete", incomplete_details: { reason: "max_output_tokens" } },
+    },
+  ];
+  const headers = { "content-type": "text/event-stream", "x-request-id": "req_test" };
+  const encoder = new TextEncoder();
+  const sse = (event: unknown) => encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Sends `terminal`, then fails like a connection that is reset before EOF or `[DONE]`. */
+  function resetAfter(terminal: unknown): Response {
+    let step = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (step++ === 0) {
+          controller.enqueue(sse(terminal));
+          return;
+        }
+        controller.error(new TypeError("terminated: other side closed"));
+      },
+    });
+    return new Response(stream, { status: 200, headers });
+  }
+
+  /** Sends `terminal` and holds the body open. With `tailMs`, sends `[DONE]` and ends the body after that long. */
+  function openAfter(terminal: unknown, tailMs?: number) {
+    const state = { ended: false, cancelled: false };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(sse(terminal));
+        if (tailMs === undefined) return;
+        setTimeout(() => {
+          if (state.cancelled) return;
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          state.ended = true;
+        }, tailMs);
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    });
+    return { state, response: new Response(stream, { status: 200, headers }) };
+  }
+
+  it.each(terminals)(
+    "create() resolves to the $response.status response despite a reset before EOF",
+    async (terminal) => {
+      const { fetch } = mockFetch(() => resetAfter(terminal));
+      const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+      const response = await client.responses.create({ ...createBody });
+      expect(response.status).toBe(terminal.response.status);
+      expect(response.id).toBe("resp_123");
+    },
+  );
+
+  it.each(terminals)(
+    "stream done() resolves to the $response.status response despite a reset before EOF",
+    async (terminal) => {
+      const { fetch } = mockFetch(() => resetAfter(terminal));
+      const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+      const stream = await client.responses.create({ ...createBody, stream: true });
+      const types: Array<string> = [];
+      for await (const event of stream) types.push(event.type);
+      expect(types).toEqual([terminal.type]);
+      const response = await stream.done();
+      expect(response.status).toBe(terminal.response.status);
+    },
+  );
+
+  it.each(terminals)(
+    "stops reading and cancels the body when the server holds it open after $type",
+    async (terminal) => {
+      const body = openAfter(terminal);
+      const { fetch } = mockFetch(() => body.response);
+      // The request timeout is far longer than the test timeout, so this only passes if the stream stops on its own.
+      const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0, timeout: 600_000 });
+      const response = await client.responses.create({ ...createBody });
+      expect(response.status).toBe(terminal.response.status);
+      expect(body.state.cancelled).toBe(true);
+    },
+  );
+
+  it("does not deliver later events to the loop or to listeners", async () => {
+    const delta = (text: string) => ({ type: "response.output_text.delta", output_index: 0, content_index: 0, delta: text });
+    const { fetch } = mockFetch(() =>
+      sseResponse([delta("Hello"), completed, delta(" again"), { type: "error", code: 529, message: "overloaded" }]),
+    );
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const stream = await client.responses.create({ ...createBody, stream: true });
+    const heard: Array<string> = [];
+    stream.on("text", (text) => heard.push(text)).on("error", () => heard.push("error"));
+    const types: Array<string> = [];
+    for await (const event of stream) types.push(event.type);
+    expect(types).toEqual(["response.output_text.delta", "response.completed"]);
+    expect(heard).toEqual(["Hello"]);
+    expect((await stream.done()).status).toBe("completed");
+  });
+
+  it("reads a tail that arrives a few milliseconds later to the end of the body", async () => {
+    vi.useFakeTimers();
+    const body = openAfter(completed, 5);
+    const { fetch } = mockFetch(() => body.response);
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const resolved = expect(client.responses.create({ ...createBody })).resolves.toMatchObject({ status: "completed" });
+    await vi.advanceTimersByTimeAsync(5);
+    await resolved;
+    expect(body.state).toEqual({ ended: true, cancelled: false });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("waits 250 ms for the end of a body that is held open, then cancels it", async () => {
+    vi.useFakeTimers();
+    const body = openAfter(completed);
+    const { fetch } = mockFetch(() => body.response);
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    let settled = false;
+    const pending = client.responses.create({ ...createBody }).finally(() => {
+      settled = true;
+    });
+    const resolved = expect(pending).resolves.toMatchObject({ status: "completed" });
+    await vi.advanceTimersByTimeAsync(249);
+    expect(settled).toBe(false);
+    expect(body.state.cancelled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await resolved;
+    expect(body.state.cancelled).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ignores the caller's abort while it reads the rest of the body", async () => {
+    vi.useFakeTimers();
+    const ac = new AbortController();
+    const { fetch } = mockFetch(() => openAfter(completed).response);
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const resolved = expect(client.responses.create({ ...createBody }, { signal: ac.signal })).resolves.toMatchObject({
+      status: "completed",
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    ac.abort();
+    await resolved;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    ["the request timeout", { timeout: 100 }],
+    ["an idle timeout", { idleTimeout: 100 }],
+  ])("ignores %s while it reads the rest of the body", async (_label, opts) => {
+    vi.useFakeTimers();
+    const { fetch } = mockFetch(() => openAfter(completed).response);
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const resolved = expect(client.responses.create({ ...createBody }, opts)).resolves.toMatchObject({
+      status: "completed",
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await resolved;
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

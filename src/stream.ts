@@ -95,6 +95,17 @@ function isLifecycleEvent(event: ResponseStreamEvent): boolean {
   return event.type === "ping" || event.type === "response.created" || event.type === "response.in_progress";
 }
 
+function isTerminalEvent(event: ResponseStreamEvent): boolean {
+  return event.type === "response.completed" || event.type === "response.failed" || event.type === "response.incomplete";
+}
+
+/**
+ * How long the stream waits for the body to end after the terminal event. A body that is read to its end leaves
+ * the connection open for the next request, while Node's `fetch` closes the connection of a body that is
+ * cancelled before its end. The wait is short, so a server that holds the socket open can't delay the response much.
+ */
+const STREAM_TAIL_GRACE_MS = 250;
+
 function isRetryableBeforeOutput(error: APIError): boolean {
   if (error instanceof APIConnectionError) return true;
   return error.status !== undefined && (RETRYABLE_STATUS.has(error.status) || SERVER_ERROR_RETRY_STATUS.has(error.status));
@@ -343,6 +354,11 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
         }
         this.#apply(event);
         yield event;
+        // The terminal event carries the whole response, so the stream ends here and nothing after it counts.
+        if (isTerminalEvent(event)) {
+          await this.#drainTail(sse);
+          return undefined;
+        }
       }
     } catch (err) {
       const error = errorFromUnknown(err, this.#requestId);
@@ -353,6 +369,24 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
       return new APIConnectionError("Stream ended before any output", { requestId: this.#requestId });
     }
     return undefined;
+  }
+
+  /**
+   * Reads and discards what follows the terminal event, until the stream ends, so the connection can be reused.
+   * After `STREAM_TAIL_GRACE_MS` it stops and cancels the body instead. The response is already complete, so
+   * nothing read here is applied or yielded, and a connection error, abort, or timeout here is ignored.
+   */
+  async #drainTail(sse: AsyncGenerator<unknown>): Promise<void> {
+    const timer = setTimeout(() => this.#closeController.abort(), STREAM_TAIL_GRACE_MS);
+    try {
+      for await (const _ of sse) {
+        // discarded
+      }
+    } catch {
+      // the response is already complete
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   #normalize(raw: unknown): ResponseStreamEvent {
@@ -370,17 +404,10 @@ export class ResponseStream implements AsyncIterable<ResponseStreamEvent> {
   }
 
   #apply(event: ResponseStreamEvent): void {
-    switch (event.type) {
-      case "response.completed":
-      case "response.failed":
-      case "response.incomplete":
-        this.#final = this.#terminalResponse((event as { response?: unknown }).response);
-        break;
-      case "error":
-        this.#error = event.error ?? this.#error;
-        break;
-      default:
-        break;
+    if (isTerminalEvent(event)) {
+      this.#final = this.#terminalResponse((event as { response?: unknown }).response);
+    } else if (event.type === "error") {
+      this.#error = event.error ?? this.#error;
     }
   }
 

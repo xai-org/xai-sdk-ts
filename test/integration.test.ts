@@ -19,8 +19,9 @@ afterEach(async () => {
   servers.clear();
 });
 
-async function listen(handler: RequestListener): Promise<string> {
+async function listen(handler: RequestListener, onConnection?: () => void): Promise<string> {
   const server = createServer(handler);
+  if (onConnection) server.on("connection", onConnection);
   servers.add(server);
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -101,6 +102,26 @@ describe("native fetch integration", () => {
     }).responses.create(createBody);
     expect(result.id).toBe("resp_123");
     expect(requests).toBe(2);
+  });
+
+  it("reuses the connection when the body ends a few milliseconds after the terminal event", async () => {
+    let connections = 0;
+    const baseURL = await listen(
+      (_request, response) => {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write(`data: ${JSON.stringify({ type: "response.completed", response: completedResponse })}\n\n`);
+        setTimeout(() => response.end("data: [DONE]\n\n"), 5);
+      },
+      () => {
+        connections += 1;
+      },
+    );
+    const client = new SpaceXSI({ apiKey: "test-key", baseURL, maxRetries: 0 });
+    expect((await client.responses.create(createBody)).id).toBe("resp_123");
+    // Node's fetch makes a connection available again one turn of the event loop after its response ends.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect((await client.responses.create(createBody)).id).toBe("resp_123");
+    expect(connections).toBe(1);
   });
 
   it("does not follow a 307 redirect with credentials or prompt body", async () => {
