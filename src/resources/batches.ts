@@ -165,12 +165,14 @@ export class BatchRequests {
     body: { batch_requests: Array<BatchRequest> },
     opts?: RequestOpts,
   ): Promise<{ http: HttpMeta }> {
+    // Checked first, so a bad id fails before any image is read and encoded.
+    const id = pathParam(batchId);
     const batch_requests = await Promise.all(
       body.batch_requests.map((request) => toWireRequest(request, opts?.signal)),
     );
     const result = await send(this.client, {
       method: "POST",
-      path: `/batches/${pathParam(batchId)}/requests`,
+      path: `/batches/${id}/requests`,
       body: { ...body, batch_requests },
       opts,
     });

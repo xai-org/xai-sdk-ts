@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { pathParam } from "../src/http.js";
 import { SpaceXSI } from "../src/index.js";
 import { mockFetch, jsonResponse } from "./helpers.js";
@@ -13,6 +13,10 @@ const NOT_STRING_OR_NUMBER: Array<[string, object | boolean | null | undefined, 
   ["undefined", undefined, "undefined"],
   ["true", true, "boolean"],
 ];
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("pathParam", () => {
   it("rejects values that do not address their own segment", () => {
@@ -51,6 +55,7 @@ describe("resource methods reject ids that would retarget the request", () => {
     ["batches.get", (c, id) => c.batches.get(id)],
     ["batches.cancel", (c, id) => c.batches.cancel(id)],
     ["batches.results", (c, id) => c.batches.results(id)],
+    ["batches.wait", (c, id) => c.batches.wait(id)],
     ["batches.requests.add", (c, id) => c.batches.requests.add(id, { batch_requests: [] })],
     ["batches.requests.list", (c, id) => c.batches.requests.list(id)],
     ["models.get", (c, id) => c.models.get(id)],
@@ -61,6 +66,7 @@ describe("resource methods reject ids that would retarget the request", () => {
     ["responses.delete", (c, id) => c.responses.delete(id)],
     ["responses.inputItems.list", (c, id) => c.responses.inputItems.list(id)],
     ["videos.get", (c, id) => c.videos.get(id)],
+    ["videos.wait", (c, id) => c.videos.wait(id)],
     ["voice.get", (c, id) => c.voice.get(id)],
     ["voice.custom.get", (c, id) => c.voice.custom.get(id)],
     ["voice.custom.update", (c, id) => c.voice.custom.update(id, {})],
@@ -68,8 +74,11 @@ describe("resource methods reject ids that would retarget the request", () => {
     ["voice.custom.getAudio", (c, id) => c.voice.custom.getAudio(id)],
   ];
 
+  // batches.wait and videos.wait poll on timers. Every row runs under fake timers, so a poll interval or timeout
+  // cannot delay the suite, and the timer count shows that the rejected call left no timer pending.
   for (const [name, call] of calls) {
     it(`${name} throws a TypeError for "", "." and ".." without sending a request`, async () => {
+      vi.useFakeTimers();
       const { fetch, captured } = mockFetch(() => jsonResponse({}));
       const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
       for (const bad of ["", ".", ".."]) {
@@ -78,9 +87,11 @@ describe("resource methods reject ids that would retarget the request", () => {
         await expect(pending).rejects.toThrow(`Invalid path parameter: ${JSON.stringify(bad)}`);
       }
       expect(captured.requests).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it(`${name} throws a TypeError for an id that is not a string or number without sending a request`, async () => {
+      vi.useFakeTimers();
       const { fetch, captured } = mockFetch(() => jsonResponse({}));
       const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
       for (const [, bad, type] of NOT_STRING_OR_NUMBER) {
@@ -89,6 +100,37 @@ describe("resource methods reject ids that would retarget the request", () => {
         await expect(pending).rejects.toThrow(`Invalid path parameter: expected a string or number, got ${type}`);
       }
       expect(captured.requests).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
     });
   }
+
+  it("batches.requests.add throws a TypeError for a bad id before it reads any image", async () => {
+    const { fetch, captured } = mockFetch(() => jsonResponse({}));
+    const client = new SpaceXSI({ apiKey: "test-key", fetch, maxRetries: 0 });
+    const image = new Blob(["png-bytes"], { type: "image/png" });
+    const arrayBuffer = vi.spyOn(image, "arrayBuffer");
+    const stream = vi.spyOn(image, "stream");
+    const add = (id: string) =>
+      client.batches.requests.add(id, {
+        batch_requests: [
+          {
+            batch_request: {
+              responses: { model: "grok-4.3", input: [{ role: "user", content: [{ type: "input_image", image }] }] },
+            },
+          },
+        ],
+      });
+
+    const pending = add("..");
+    await expect(pending).rejects.toThrow(TypeError);
+    await expect(pending).rejects.toThrow('Invalid path parameter: ".."');
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+    expect(captured.requests).toHaveLength(0);
+
+    // The same request with a valid id reads the image, so the spies would have caught a read above.
+    await add("batch_1");
+    expect(arrayBuffer).toHaveBeenCalledOnce();
+    expect(captured.requests).toHaveLength(1);
+  });
 });
