@@ -392,7 +392,23 @@ export type TranscriptionParams = {
   keyterm?: Array<string>;
   filler_words?: boolean;
   vad_threshold?: number;
+  /**
+   * Replaces sensitive values in `text`, `words`, and `channels` with tags such as `[NAME_1]`. Each
+   * entry is a group (`pii`, `pci`, or `phi`) or a single type such as `ssn`, and is sent as its own
+   * `redact` field. `pii` leaves card and bank details in place, so add `pci`, `bank_account`, and
+   * `routing_number` to redact those too. The request fails with a 503 instead of returning an
+   * unredacted transcript when redaction cannot run.
+   *
+   * The streaming endpoint at `wss://api.x.ai/v1/stt` takes the same values as repeated `redact`
+   * query parameters, and sends no interim results while it is set.
+   */
+  redact?: Array<TranscriptionRedaction>;
+  /** Adds the original words to each redacted word as `redacted_text`. Only applies with `redact`. */
+  show_redacted_text?: boolean;
 } & ({ file: Blob | File; url?: never } | { url: string; file?: never });
+
+/** A redaction group, or any single type the API accepts, such as `ssn` or `bank_account`. */
+export type TranscriptionRedaction = "pii" | "pci" | "phi" | (string & {});
 
 type TranscriptionWord = {
   text: string;
@@ -400,6 +416,8 @@ type TranscriptionWord = {
   end: number;
   confidence?: number;
   speaker?: number;
+  /** The original words a redaction tag replaced. Present when `show_redacted_text` is true. */
+  redacted_text?: string;
 };
 
 export type Transcription = {

@@ -168,6 +168,36 @@ describe("voice.transcribe", () => {
     expect(res.http.requestId).toBe("req_test");
   });
 
+  it("sends each redact value as its own field and returns redacted_text on words", async () => {
+    const redacted = {
+      text: "My name is [NAME_1].",
+      language: "en",
+      duration: 1.8,
+      words: [
+        { text: "My", start: 0.1, end: 0.3 },
+        { text: "[NAME_1]", start: 1.1, end: 1.6, redacted_text: "Ada Lovelace" },
+      ],
+    };
+    const { fetch, captured } = mockFetch(() => jsonResponse(redacted));
+    const res = await client(fetch).voice.transcribe({
+      url: "https://example.com/call.mp3",
+      language: "en",
+      redact: ["pii", "pci", "bank_account"],
+      show_redacted_text: true,
+    });
+
+    expect(await formEntries(captured.requests[0])).toEqual([
+      ["url", "https://example.com/call.mp3"],
+      ["language", "en"],
+      ["redact", "pii"],
+      ["redact", "pci"],
+      ["redact", "bank_account"],
+      ["show_redacted_text", "true"],
+    ]);
+    expect(res.text).toBe("My name is [NAME_1].");
+    expect(res.words?.[1]?.redacted_text).toBe("Ada Lovelace");
+  });
+
   it("names an unnamed Blob after its MIME type, so the API can tell its format", async () => {
     const bytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
     const { fetch, captured } = mockFetch(() => jsonResponse(transcription));
