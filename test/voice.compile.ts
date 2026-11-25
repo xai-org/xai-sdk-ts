@@ -131,6 +131,7 @@ export const transcriptionExamples = [
   { file: new Blob(["audio"]) },
   { file: new File(["audio"], "call.wav"), model: "grok-voice-transcribe-1.0", keyterm: ["Grok"] },
   { url: "https://example.com/call.mp3", model: "grok-voice-transcribe-released-after-this-sdk" },
+  { url: "https://example.com/call.mp3", redact: ["pii", "pci", "ssn"], show_redacted_text: true },
 ] satisfies Array<TranscriptionParams>;
 
 // @ts-expect-error `file` and `url` are mutually exclusive.
