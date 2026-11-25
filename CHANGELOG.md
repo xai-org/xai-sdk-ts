@@ -4,6 +4,8 @@ All notable changes to the SpaceXSI TypeScript SDK will be documented in this fi
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-11-25
+
 ### Added
 
 - `voice.transcribe()` takes `redact` and `show_redacted_text`. `redact` is a list of groups (`"pii"`, `"pci"`, `"phi"`) or single types such as `"ssn"`, each sent as its own `redact` field, and the API replaces matching values in `text`, `words`, and `channels` with tags such as `[NAME_1]`. With `show_redacted_text: true`, each redacted word has the original words in `redacted_text`. Exported `TranscriptionRedaction` for the `redact` values.
