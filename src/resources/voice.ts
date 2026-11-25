@@ -1,4 +1,4 @@
-import { send, type SendResult } from "../http.js";
+import { send, type SendResult, pathParam } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { BinaryResponse } from "../binary.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
@@ -173,7 +173,7 @@ export class VoiceResource {
   async get(voiceId: VoiceId, opts?: RequestOpts): Promise<Voice & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/tts/voices/${encodeURIComponent(voiceId)}`,
+      path: `/tts/voices/${pathParam(voiceId)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Voice");
@@ -232,7 +232,7 @@ export class CustomVoices {
   async get(voiceId: string, opts?: RequestOpts): Promise<CustomVoice & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/custom-voices/${encodeURIComponent(voiceId)}`,
+      path: `/custom-voices/${pathParam(voiceId)}`,
       opts,
     });
     return toCustomVoice(result);
@@ -245,7 +245,7 @@ export class CustomVoices {
   ): Promise<CustomVoice & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "PATCH",
-      path: `/custom-voices/${encodeURIComponent(voiceId)}`,
+      path: `/custom-voices/${pathParam(voiceId)}`,
       body,
       opts,
     });
@@ -255,7 +255,7 @@ export class CustomVoices {
   async delete(voiceId: string, opts?: RequestOpts): Promise<{ deleted: true; http: HttpMeta }> {
     const result = await send(this.client, {
       method: "DELETE",
-      path: `/custom-voices/${encodeURIComponent(voiceId)}`,
+      path: `/custom-voices/${pathParam(voiceId)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Custom voice delete response");
@@ -271,7 +271,7 @@ export class CustomVoices {
   async getAudio(voiceId: string, opts?: RequestOpts): Promise<BinaryResponse> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/custom-voices/${encodeURIComponent(voiceId)}/audio`,
+      path: `/custom-voices/${pathParam(voiceId)}/audio`,
       binary: true,
       opts,
     });

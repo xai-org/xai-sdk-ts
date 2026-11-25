@@ -1,4 +1,4 @@
-import { send } from "../http.js";
+import { send, pathParam } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { requireRecord } from "./shared.js";
 import type {
@@ -55,7 +55,7 @@ export class ModelsResource {
   async get(id: string, opts?: RequestOpts): Promise<Model & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/models/${encodeURIComponent(id)}`,
+      path: `/models/${pathParam(id)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Model");
@@ -99,7 +99,7 @@ export class LanguageModels {
   async get(id: ModelId, opts?: RequestOpts): Promise<LanguageModel & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/language-models/${encodeURIComponent(id)}`,
+      path: `/language-models/${pathParam(id)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Language model");
@@ -146,7 +146,7 @@ export class ImageModels {
   ): Promise<ImageGenerationModel & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/image-generation-models/${encodeURIComponent(id)}`,
+      path: `/image-generation-models/${pathParam(id)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Image model");
@@ -193,7 +193,7 @@ export class VideoModels {
   ): Promise<VideoGenerationModel & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/video-generation-models/${encodeURIComponent(id)}`,
+      path: `/video-generation-models/${pathParam(id)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Video model");

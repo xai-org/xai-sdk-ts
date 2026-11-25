@@ -1,6 +1,6 @@
 import { applyCreateDefaults, inlineBlobs } from "../porcelain.js";
 import { CLIENT_REQUEST_ID_HEADER, MAX_TIMEOUT_MS } from "../constants.js";
-import { RetryBudget, send } from "../http.js";
+import { RetryBudget, send, pathParam } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { ModelResponse } from "../response.js";
 import { ResponseStream, type StreamRetry } from "../stream.js";
@@ -156,7 +156,7 @@ export class Responses {
   async get(id: string, opts?: RequestOpts): Promise<ModelResponse> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/responses/${encodeURIComponent(id)}`,
+      path: `/responses/${pathParam(id)}`,
       opts,
     });
     return new ModelResponse(result.payload, result.http);
@@ -165,7 +165,7 @@ export class Responses {
   async delete(id: string, opts?: RequestOpts): Promise<DeletedResponse & { http: import("../types.js").HttpMeta }> {
     const result = await send(this.client, {
       method: "DELETE",
-      path: `/responses/${encodeURIComponent(id)}`,
+      path: `/responses/${pathParam(id)}`,
       opts,
     });
     const body = result.http.status === 204
@@ -192,7 +192,7 @@ export class InputItems {
     const fetchPage = async (pageQuery: typeof query) => {
       const result = await send(this.client, {
         method: "GET",
-        path: `/responses/${encodeURIComponent(id)}/input_items`,
+        path: `/responses/${pathParam(id)}/input_items`,
         query: pageQuery,
         opts,
       });

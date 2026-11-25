@@ -1,4 +1,4 @@
-import { send, type SendResult } from "../http.js";
+import { send, type SendResult, pathParam } from "../http.js";
 import { APIProtocolError, requestIds } from "../errors.js";
 import { BinaryResponse } from "../binary.js";
 import { tokenPages, type PagePromise } from "../pagination.js";
@@ -78,7 +78,7 @@ export class Files {
   async get(id: string, opts?: RequestOpts): Promise<FileObject & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/files/${encodeURIComponent(id)}`,
+      path: `/files/${pathParam(id)}`,
       opts,
     });
     return toFileObject(result);
@@ -87,7 +87,7 @@ export class Files {
   async delete(id: string, opts?: RequestOpts): Promise<DeletedFile & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "DELETE",
-      path: `/files/${encodeURIComponent(id)}`,
+      path: `/files/${pathParam(id)}`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "File delete response");
@@ -103,7 +103,7 @@ export class Files {
   async content(id: string, query: FileContentParams = {}, opts?: RequestOpts): Promise<BinaryResponse> {
     const result = await send(this.client, {
       method: "GET",
-      path: `/files/${encodeURIComponent(id)}/content`,
+      path: `/files/${pathParam(id)}/content`,
       query,
       binary: true,
       opts,
@@ -118,7 +118,7 @@ export class Files {
   ): Promise<FilePublicUrl & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "POST",
-      path: `/files/${encodeURIComponent(id)}/public-url`,
+      path: `/files/${pathParam(id)}/public-url`,
       body: params,
       opts,
     });
@@ -135,7 +135,7 @@ export class Files {
   async revokePublicUrl(id: string, opts?: RequestOpts): Promise<FilePublicUrlRevocation & { http: HttpMeta }> {
     const result = await send(this.client, {
       method: "POST",
-      path: `/files/${encodeURIComponent(id)}/public-url/revoke`,
+      path: `/files/${pathParam(id)}/public-url/revoke`,
       opts,
     });
     const body = requireRecord(result.payload, result.http, "Public URL revoke response");
